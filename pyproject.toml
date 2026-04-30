@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "agentic-rag-iteration-1"
+version = "0.1.0"
+description = "Agentic RAG with MLP Router and Weighted Retrieval"
+authors = ["Gemini CLI"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.13"
+langgraph = "*"
+qdrant-client = "*"
+torch = "2.2.2"
+sentence-transformers = "*"
+ragas = "*"
+langchain = "*"
+langchain-google-genai = "*"
+langchain-community = "*"
+pandas = "*"
+numpy = "*"
+python-dotenv = "^1.2.2"
+google-generativeai = "^0.8.6"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
