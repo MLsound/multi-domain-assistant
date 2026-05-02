@@ -37,14 +37,47 @@ class MLPRouter:
         self.mlp.eval()
 
     def route(self, query: str) -> Dict[str, float]:
+        self.mlp.eval()
         with torch.no_grad():
             embedding = self.embedding_model.encode([query], convert_to_tensor=True).to(self.device)
             probs = self.mlp(embedding).cpu().numpy()[0]
             
         return {cat: float(prob) for cat, prob in zip(self.categories, probs)}
 
+    def train_model(self, training_data: List[Dict[str, str]], epochs: int = 50):
+        """
+        Trains the MLP on the provided texts and their corresponding categories.
+        """
+        self.mlp.train()
+        texts = [d["text"] for d in training_data]
+        # Map category names to indices
+        labels = torch.tensor([self.categories.index(d["category"]) for d in training_data]).to(self.device)
+        
+        print(f"Embedding {len(texts)} training samples...")
+        embeddings = self.embedding_model.encode(texts, convert_to_tensor=True).to(self.device)
+        
+        optimizer = torch.optim.Adam(self.mlp.parameters(), lr=0.001)
+        criterion = nn.CrossEntropyLoss()
+        
+        print(f"Starting training for {epochs} epochs...")
+        for epoch in range(epochs):
+            optimizer.zero_grad()
+            outputs = self.mlp(embeddings)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            
+            if (epoch + 1) % 10 == 0:
+                print(f"Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}")
+        
+        self.mlp.eval()
+        print("Training complete.")
+
+    def save(self, path: str):
+        torch.save(self.mlp.state_dict(), path)
+        print(f"Model saved to {path}")
+
 # Helper to create a dummy model for testing
 def create_dummy_model(save_path: str):
     router = MLPRouter()
-    torch.save(router.mlp.state_dict(), save_path)
-    print(f"Dummy model saved to {save_path}")
+    router.save(save_path)
