@@ -1,0 +1,1 @@
+The primary heat transfer equation is  = U \cdot A \cdot \Delta T$. For multi-layer assemblies, total thermal resistance is additive: {total} = R_1 + R_2 + \dots + R_n$. High-performance insulation can reduce total HVAC energy usage by up to 77.81%.

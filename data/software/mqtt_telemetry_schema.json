@@ -1,0 +1,9 @@
+{
+  "description": "Standard solar panel record pattern",
+  "fields": ["ambienttemperature_c", "poweroutput_kw", "voltage", "tstamp"],
+  "qos_logic": {
+    "0": "High-frequency telemetry",
+    "1": "Critical state changes",
+    "2": "Billing or irreversible commands"
+  }
+}

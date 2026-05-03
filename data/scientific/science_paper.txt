@@ -1,0 +1,1 @@
+Scientific Paper: Weather API provides high-resolution consistent atmospheric variables.

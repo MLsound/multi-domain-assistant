@@ -1,0 +1,1 @@
+The Sensible Heat Ratio (SHR) defines the slope of the path supply air travels within a space. It is the ratio of room sensible heat to room total heat, crucial for determining if a cooling coil can meet both temperature and dehumidification requirements.

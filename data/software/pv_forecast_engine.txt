@@ -1,0 +1,4 @@
+Forecasting engine (e.g., SolarEdge2MQTT) utilizes built-in machine learning models to predict next-day yield.
+- Prerequisites: Minimum 60 hours of consistent historical training data.
+- Inputs: Live OpenWeatherMap data, historical InfluxDB production logs, and panel orientation.
+- Output: 24-hour production curve in 15-minute intervals.

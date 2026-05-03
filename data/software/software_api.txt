@@ -1,0 +1,1 @@
+Software API Reference: The resource manager handles allocation of compute units.

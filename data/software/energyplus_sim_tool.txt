@@ -1,0 +1,1 @@
+The run_energyplus_simulation tool executes a full thermal model of the building envelope. Inputs include a validated.idf file and a.epw weather file. The tool returns annual or sub-hourly energy demand profiles for HVAC, lighting, and internal equipment, allowing the HEMS agent to validate proposed efficiency measures against a physics-based simulation.

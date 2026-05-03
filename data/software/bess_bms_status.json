@@ -1,0 +1,9 @@
+{
+  "metrics": {
+    "soc_percent": "State of Charge (e.g., 85%)",
+    "soh_percent": "State of Health (capacity retention over time)",
+    "charge_rate_kw": "Current power flow into the battery pack",
+    "discharge_rate_kw": "Current power flow out of the battery pack",
+    "internal_temp_c": "Cell temperature monitoring for NFPA 855 safety compliance"
+  }
+}

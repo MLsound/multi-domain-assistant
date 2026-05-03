@@ -1,0 +1,9 @@
+{
+  "device_type": "Smart Wallbox",
+  "control_interface": "OCPP 1.6J / Modbus TCP",
+  "logic": {
+    "peak_shaving": "Decrease charge current if total household load exceeds 7kW.",
+    "solar_matching": "Adjust charge rate dynamically based on 'poweroutput_kw' telemetry.",
+    "trickle_mode_threshold": "Charge at minimum 6A if Battery SOC < 25%."
+  }
+}

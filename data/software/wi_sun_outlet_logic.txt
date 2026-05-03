@@ -1,0 +1,1 @@
+Smart outlets utilizing the WI-SUN Home Area Network (HAN) specification support intrusive load monitoring. The HEMS middleware uses these devices to identify the energy signature of individual appliances (e.g., microwave vs. refrigerator) when total meter data is too aggregate for precise optimization.

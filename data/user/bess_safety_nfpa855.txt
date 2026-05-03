@@ -1,0 +1,4 @@
+Safety protocols for Battery Energy Storage Systems (BESS) follow NFPA 855:
+- Clearance: Maintain a minimum 3-foot (36-inch) clearance from combustibles.
+- Ventilation: Prevent gas accumulation above 25% of the lower explosive limit (LEL).
+- Response: Use water for lithium-ion fires; lithium salts are non-reactive with water.
