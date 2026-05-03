@@ -7,7 +7,7 @@ def setup():
     # 1. Initialize mapping of directories to categories
     category_map = {
         "data/software": "Software",
-        "data/user_manuals": "User",
+        "data/user": "User",
         "data/scientific": "Science"
     }
     
