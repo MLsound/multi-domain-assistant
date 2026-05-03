@@ -1,4 +1,5 @@
 # Knowledge Assistant
+
 ## **Agentic RAG Assistant for Universal Knowledge Domains**
 
 **Knowledge Assistant** is a local iteration of a multi-category document-consultation chatbot using an Agentic RAG architecture. By leveraging a custom MLP-based semantic router and weighted hybrid retrieval, this system can seamlessly navigate and synthesize information across disparate domains—from software documentation to scientific research.
@@ -9,7 +10,7 @@
 graph TD
     User([User Query]) --> RouterNode[Router Node:<br>MLP Classification]
     RouterNode --> |"P(c|q) Distribution"| RetrievalNode[Retrieval Node:<br>Weighted Search]
-    
+  
     subgraph "Retrieval & Context Injection"
         RetrievalNode --> Qdrant[(Qdrant DB)]
         RetrievalNode --> |Domain Detection| MCP[Domain MCP Mock]
@@ -17,7 +18,7 @@ graph TD
 
     Qdrant --> |Top-K Chunks| SynthesisNode[Synthesis Node:<br>Grounded LLM]
     MCP --> |Data Enrichment Injection| SynthesisNode
-    
+  
     SynthesisNode --> Response([Grounded Response])
 
     subgraph "Logic Overrides"
@@ -39,10 +40,10 @@ graph TD
 
 - **Orchestration**: LangGraph
 - **Vector Database**: Qdrant (Local Docker)
-- **Embeddings**: 
+- **Embeddings**:
   - Router: all-MiniLM-L6-v2
   - RAG Index: bge-large-en-v1.5
-- **LLM**: Gemini Flash Lite (`gemini-flash-lite-latest`)
+- **LLM**: Gemini Flash Lite (`gemini-flash-lite-latest`) or Claude.
 - **Frameworks**: PyTorch, Sentence-Transformers, LangChain
 - **Environment**: Python 3.11 (Poetry)
 - **Evaluation**: Ragas
@@ -76,40 +77,49 @@ graph TD
 ## Setup & Installation
 
 ### 1. Prerequisites
+
 - Docker (for Qdrant)
 - Poetry
 
 ### 2. Configure Environment
+
 Copy the example environment file and add your API key:
+
 ```bash
 cp .env.example .env
 # Edit .env and add your GOOGLE_API_KEY
 ```
 
 ### 3. Quick Start (Automatic)
+
 The provided `run.sh` script handles Docker initialization, indexing, and running tests:
+
 ```bash
 chmod +x run.sh
 ./run.sh
 ```
 
 ### 4. Manual Execution
+
 If you prefer to run steps individually:
 
 **A. Initialize System & Index Documents**
 The `setup.py` script trains the local MLP model on the available document corpus and indexes the files (supporting `.txt`, `.json`, `.yaml`, and `.py`) into Qdrant:
+
 ```bash
 poetry run python setup.py
 ```
 
 **B. Run Automated Smoke Test**
 The `smoke_test.py` script executes a series of benchmark queries to verify routing logic and retrieval accuracy:
+
 ```bash
 poetry run python smoke_test.py
 ```
 
 **C. Interactive Chat**
 To use the interactive CLI:
+
 ```bash
 poetry run python chat.py
 ```
@@ -117,11 +127,13 @@ poetry run python chat.py
 ## Evaluation
 
 The `evaluate.py` script utilizes the Ragas framework to measure system performance. It executes a strictly sequential evaluation to respect rate limits:
+
 ```bash
 poetry run python evaluate.py
 ```
 
 Key Metrics:
+
 - **Faithfulness**: Ensures the synthesis node doesn't hallucinate technical steps.
 - **Context Recall**: Verifies if the MLP Router is selecting the correct sources.
 
@@ -129,4 +141,4 @@ Key Metrics:
 
 - **Help Section Override**: Automatically redirects weights to 85% Software / 15% Science when `is_help_section` is active.
 - **Groundedness Check**: The synthesis agent is instructed to report ignorance if the context is insufficient.
-ient.
+  ient.
