@@ -1,0 +1,122 @@
+[
+  {
+    "question": "What mathematical distribution is used to model photovoltaic module lifespan?",
+    "is_help": false,
+    "ground_truth": "The two-parameter Weibull distribution is used to model photovoltaic module lifespan based on thermal and humidity stress.",
+    "expected_domain": "Science"
+  },
+  {
+    "question": "Why is MPPT more efficient than PWM controllers in cold weather?",
+    "is_help": false,
+    "ground_truth": "MPPT is more efficient because it tracks the maximum power point, delivering 15-30% more power, especially in cold weather when panel voltage significantly exceeds battery voltage.",
+    "expected_domain": "Science"
+  },
+  {
+    "question": "Define the Sensible Heat Ratio (SHR) and its importance.",
+    "is_help": false,
+    "ground_truth": "SHR is the ratio of room sensible heat to room total heat. It determines if a cooling coil can meet both temperature and dehumidification requirements.",
+    "expected_domain": "Science"
+  },
+  {
+    "question": "What is the peak shaving logic for the Smart Wallbox?",
+    "is_help": false,
+    "ground_truth": "The logic is to decrease the charge current if the total household load exceeds 7kW.",
+    "expected_domain": "Software"
+  },
+  {
+    "question": "How does the HEMS middleware identify individual appliance energy signatures?",
+    "is_help": false,
+    "ground_truth": "It uses smart outlets utilizing the WI-SUN Home Area Network (HAN) specification for intrusive load monitoring.",
+    "expected_domain": "Software"
+  },
+  {
+    "question": "What is the specific API command string to set a Nest thermostat mode?",
+    "is_help": false,
+    "ground_truth": "The command string is 'sdm.devices.commands.ThermostatMode.SetMode'.",
+    "expected_domain": "Software"
+  },
+  {
+    "question": "What are the NFPA 855 clearance requirements for BESS?",
+    "is_help": false,
+    "ground_truth": "A minimum 3-foot (36-inch) clearance from combustibles must be maintained.",
+    "expected_domain": "User"
+  },
+  {
+    "question": "How should a user respond to a lithium-ion battery fire?",
+    "is_help": false,
+    "ground_truth": "Use water for lithium-ion fires because lithium salts are non-reactive with water.",
+    "expected_domain": "User"
+  },
+  {
+    "question": "What is the recommended relative humidity range for user comfort?",
+    "is_help": false,
+    "ground_truth": "The recommended 'Comfort Zone' is between 40% and 60% relative humidity.",
+    "expected_domain": "User"
+  },
+  {
+    "question": "How do environmental variables affect photovoltaic efficiency according to the research data?",
+    "is_help": true,
+    "ground_truth": "Efficiency degrades by 0.4% to 0.5% for every degree Celsius above 25\u00b0C, and high humidity (85% RH at 85\u00b0C) can cause circuitry corrosion.",
+    "expected_domain": "Science"
+  },
+  {
+    "question": "What formula estimates PV module temperature using TNOCT?",
+    "is_help": false,
+    "ground_truth": "T_mod = T_amb + (G / 800) * (TNOCT - 20), where G is solar irradiance in W/m2, T_amb is ambient temperature, and TNOCT is the Nominal Operating Cell Temperature.",
+    "expected_domain": "Science"
+  },
+  {
+    "question": "How does panel tilt angle affect annual irradiance capture?",
+    "is_help": false,
+    "ground_truth": "The optimal tilt angle equals the site latitude for maximum annual irradiance capture. Deviations reduce total energy yield.",
+    "expected_domain": "Science"
+  },
+  {
+    "question": "What is the latent heat transfer formula for moist air?",
+    "is_help": false,
+    "ground_truth": "Q = m_dot * delta_h, where m_dot is the mass flow rate and delta_h is the specific enthalpy difference. This represents the energy involved in moisture condensing on cooling coils.",
+    "expected_domain": "Science"
+  },
+  {
+    "question": "What MQTT topic structure does the inverter telemetry schema define?",
+    "is_help": false,
+    "ground_truth": "The inverter telemetry schema defines topics for real-time power output, battery state of charge, and grid feed-in status using structured JSON payloads.",
+    "expected_domain": "Software"
+  },
+  {
+    "question": "What are the three HEMS operating modes?",
+    "is_help": false,
+    "ground_truth": "The three HEMS operating modes are: ZENKI/AI Mode (dynamic scheduling based on 24-hour forecasting), Auto Mode (fixed Time-of-Use schedules), and Expert Mode (manual override of battery export thresholds).",
+    "expected_domain": "Software"
+  },
+  {
+    "question": "What is the Zigbee security key rotation policy in the smart building configuration?",
+    "is_help": false,
+    "ground_truth": "The Zigbee security configuration specifies periodic network key rotation to prevent unauthorized device access, typically enforced at the coordinator level.",
+    "expected_domain": "Software"
+  },
+  {
+    "question": "What seasonal maintenance steps should be taken before winter for PV systems?",
+    "is_help": false,
+    "ground_truth": "Before winter, users should clean panels of debris, check mounting integrity, inspect wiring for damage, and verify battery health for off-grid systems.",
+    "expected_domain": "User"
+  },
+  {
+    "question": "What are the EV charging preferences for off-peak scheduling?",
+    "is_help": false,
+    "ground_truth": "EV charging should be scheduled during off-peak hours (typically late night) to reduce grid load and minimize electricity costs, configured via the HEMS smart charging interface.",
+    "expected_domain": "User"
+  },
+  {
+    "question": "What geofencing trigger behavior does the HEMS support?",
+    "is_help": false,
+    "ground_truth": "The HEMS uses geofencing to automatically adjust thermostat setpoints and appliance schedules when the user's smartphone enters or exits a defined geographic boundary around the home.",
+    "expected_domain": "User"
+  },
+  {
+    "question": "How does building insulation longevity relate to overall energy efficiency?",
+    "is_help": false,
+    "ground_truth": "Insulation R-value degrades over time due to moisture absorption and material compression. Reduced R-value increases thermal bridging, raising heating and cooling loads and reducing overall building energy efficiency.",
+    "expected_domain": "Science"
+  }
+]

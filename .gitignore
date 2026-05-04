@@ -1,2 +1,48 @@
+# Environment
 .env
+
+# Python
 *.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Poetry
+# poetry.lock is committed intentionally
+
+# Models (do not commit weights — use setup.py or ollama pull)
+models/
+*.pth
+*.gguf
+*.bin
+*.safetensors
+
+# Generated output (logs and reports contain runtime data)
+logs/
+reports/
+
+# HuggingFace cache
+.cache/
+
+# Test artefacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
