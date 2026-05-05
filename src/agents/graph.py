@@ -109,12 +109,30 @@ def _make_guard_input_node(guard: GuardAgent):
     return node
 
 
+_UNCACHEABLE_RESPONSES = {
+    "service temporarily unavailable. please try again.",
+    "i don't have enough information in my knowledge base to answer this question.",
+    "no response was generated.",
+    "response could not be delivered safely.",
+}
+
+
 def _make_guard_output_node(guard: GuardAgent, cache: SemanticCache):
     def node(state: GraphState) -> Dict[str, Any]:
         result = guard.validate_output(state)
         validated = result.get("guard_output_result", {}).get("validated_response", "")
-        # Store the validated response and cache the approved response
-        if result["guard_output_result"]["is_safe"] and not state.get("from_cache"):
+
+        # Only cache safe, substantive responses with at least one cited source.
+        # Never cache fallback / error messages — doing so poisons the cache and
+        # causes every repeated query to return the error instead of retrying.
+        should_cache = (
+            result["guard_output_result"]["is_safe"]
+            and not state.get("from_cache")
+            and bool(state.get("sources_cited"))
+            and validated.strip().lower() not in _UNCACHEABLE_RESPONSES
+            and len(validated.strip()) > 50
+        )
+        if should_cache:
             try:
                 cache.store(
                     state.get("query", ""),

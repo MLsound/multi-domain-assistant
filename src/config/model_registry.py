@@ -21,6 +21,21 @@ logger = logging.getLogger(__name__)
 
 _PRIORITY = ["gemini", "claude", "groq", "openrouter", "kimi", "ollama"]
 
+# Known placeholder values copied verbatim from .env.example that users
+# forget to replace.  Treat these as "key not set".
+_PLACEHOLDER_VALUES = {
+    "your_gemini_api_key_here",
+    "your_claude_api_key_here",
+    "your_groq_api_key_here",
+    "your_openrouter_api_key_here",
+    "your_kimi_api_key_here",
+}
+
+
+def _is_real_key(value: str | None) -> bool:
+    """Return True only when value is a non-empty, non-placeholder string."""
+    return bool(value) and value.strip() not in _PLACEHOLDER_VALUES
+
 
 def _detect_provider() -> str:
     """Return the first available provider based on environment API keys."""
@@ -28,15 +43,15 @@ def _detect_provider() -> str:
         logger.info("LLM_PROVIDER forced to: %s", settings.llm_provider)
         return settings.llm_provider
 
-    if settings.google_api_key:
+    if _is_real_key(settings.google_api_key):
         return "gemini"
-    if settings.anthropic_api_key:
+    if _is_real_key(settings.anthropic_api_key):
         return "claude"
-    if settings.groq_api_key:
+    if _is_real_key(settings.groq_api_key):
         return "groq"
-    if settings.openrouter_api_key:
+    if _is_real_key(settings.openrouter_api_key):
         return "openrouter"
-    if settings.moonshot_api_key:
+    if _is_real_key(settings.moonshot_api_key):
         return "kimi"
     # Default to Ollama — will fail at invocation time if Ollama is not running
     return "ollama"
@@ -173,6 +188,34 @@ class ModelRegistry:
         # Intentional unconditional stdout print (Option C)
         print(f"[ModelRegistry] Active provider: {label}")
         logger.info("ModelRegistry initialised — provider=%s", self._provider)
+
+        # Warn clearly when no real API key was found and we fell back to Ollama
+        # with no forced LLM_PROVIDER setting.  This surfaces the configuration
+        # problem at startup instead of silently failing on the first query.
+        if self._provider == "ollama" and settings.llm_provider == "auto":
+            print(
+                "[ModelRegistry] WARNING: No valid API key detected in .env. "
+                "All API key fields contain placeholder values or are empty. "
+                "Set a real key (e.g. GROQ_API_KEY) in .env or set LLM_PROVIDER=ollama "
+                "to use local Ollama inference."
+            )
+        # Warn when a key is present but matches a known placeholder
+        for env_name, key_value, provider_name in [
+            ("GOOGLE_API_KEY",     settings.google_api_key,     "gemini"),
+            ("ANTHROPIC_API_KEY",  settings.anthropic_api_key,  "claude"),
+            ("GROQ_API_KEY",       settings.groq_api_key,       "groq"),
+            ("OPENROUTER_API_KEY", settings.openrouter_api_key, "openrouter"),
+            ("MOONSHOT_API_KEY",   settings.moonshot_api_key,   "kimi"),
+        ]:
+            if (
+                key_value
+                and key_value.strip() in _PLACEHOLDER_VALUES
+                and self._provider != provider_name
+            ):
+                print(
+                    f"[ModelRegistry] WARNING: {env_name} contains the placeholder "
+                    f"'your_..._api_key_here'. Replace it with a real key in .env."
+                )
 
     def get_llm(
         self,
