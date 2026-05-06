@@ -78,6 +78,19 @@ app.add_middleware(
 # Endpoints
 # ---------------------------------------------------------------------------
 
+@app.get("/")
+async def root():
+    """Root endpoint — returns API name and links to docs and health check."""
+    return {
+        "name": "Knowledge Assistant API",
+        "version": "0.2.0",
+        "docs": "/docs",
+        "health": "/health",
+        "metrics": "/metrics",
+        "usage": "POST /query with JSON body: {\"query\": \"your question here\"}",
+    }
+
+
 @app.post("/query", response_model=QueryResponse)
 async def query(req: QueryRequest):
     """Submit a natural-language query and receive a grounded response."""

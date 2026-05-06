@@ -70,7 +70,7 @@ if ($LASTEXITCODE -ne 0) {
 Info "Prerequisites satisfied."
 
 # ---------------------------------------------------------------------------
-# Step 1b: Validate .env — catch placeholder keys before wasting time
+# Step 1b: Validate .env - catch placeholder keys before wasting time
 # ---------------------------------------------------------------------------
 $placeholders = @(
     "your_gemini_api_key_here",
@@ -111,17 +111,17 @@ if (-not $hasRealKey -and $llmProvider -ne "ollama") {
     Warn ""
     Warn "Choose one of these options and edit .env:"
     Warn ""
-    Warn "  Option A — Groq (FREE, no credit card, recommended):"
+    Warn "  Option A - Groq (FREE, no credit card, recommended):"
     Warn "    1. Register at https://console.groq.com"
     Warn "    2. Create an API key"
     Warn "    3. In .env, add:  GROQ_API_KEY=gsk_your_real_key_here"
     Warn "    4. Run:  poetry install --extras groq"
     Warn ""
-    Warn "  Option B — Google Gemini (free tier):"
+    Warn "  Option B - Google Gemini (free tier):"
     Warn "    1. Get a key at https://aistudio.google.com/apikey"
     Warn "    2. In .env, replace: GOOGLE_API_KEY=your_actual_key_here"
     Warn ""
-    Warn "  Option C — Ollama local (no API key, requires Ollama installed):"
+    Warn "  Option C - Ollama local (no API key, requires Ollama installed):"
     Warn "    1. Install from https://ollama.ai/download"
     Warn "    2. Run: ollama pull phi3:mini"
     Warn "    3. In .env, add: LLM_PROVIDER=ollama"
@@ -132,7 +132,7 @@ if (-not $hasRealKey -and $llmProvider -ne "ollama") {
 if ($hasRealKey) {
     Info "LLM provider key detected in .env."
 } else {
-    Info "LLM_PROVIDER=ollama detected — local inference mode."
+    Info "LLM_PROVIDER=ollama detected - local inference mode."
 }
 
 # ---------------------------------------------------------------------------

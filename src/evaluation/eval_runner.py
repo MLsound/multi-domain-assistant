@@ -3,24 +3,28 @@ Evaluation runner for the Knowledge Assistant.
 
 Loads test cases from data/eval/test_suite.json, runs inference via RAGGraph,
 and computes per-question metrics:
-  - faithfulness (Ragas)
-  - context_recall (Ragas)
-  - precision_at_k (fraction of top-k chunks from expected domain)
+  - faithfulness     (Ragas 0.2 — LLM-based)
+  - context_recall   (Ragas 0.2 — LLM-based)
+  - precision_at_k   (fraction of top-k chunks from expected domain)
   - retrieval_time_ms
   - total_latency_ms
   - token_count
-  - semantic_similarity (cosine, bge-large)
+  - semantic_similarity (cosine via bge-large-en-v1.5)
   - rouge_l
 
-Replaces the brute-force asyncio.sleep(15) in evaluate.py with tenacity
-exponential backoff on rate-limit errors.
+Compatible with ragas>=0.2.15. The 0.1 wrappers (BaseRagasLLM,
+BaseRagasEmbeddings) have been removed; ragas 0.2 accepts any LangChain
+BaseChatModel directly via LangchainLLMWrapper.
+
+The evaluator LLM is selected from the project's ModelRegistry so the same
+provider used for synthesis (Groq, Gemini, etc.) is also used for evaluation.
+GOOGLE_API_KEY is no longer required — any configured provider works.
 
 Output: reports/evaluation_results.json
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import os
@@ -62,110 +66,36 @@ def run_evaluation(
 ) -> Dict[str, Any]:
     """Run the full evaluation suite and write results to output_path."""
 
-    if "GOOGLE_API_KEY" not in os.environ:
-        logger.error("GOOGLE_API_KEY not set — Ragas evaluation requires Gemini API access.")
-        return {}
-
-    # Import heavy dependencies only when evaluation actually runs
-    from datasets import Dataset
-    from langchain_core.outputs import Generation, LLMResult
-    from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+    # --- Ragas 0.2 imports ---
     from ragas import evaluate
-    from ragas.embeddings import BaseRagasEmbeddings
-    from ragas.llms import BaseRagasLLM
+    from ragas.dataset_schema import EvaluationDataset, SingleTurnSample
+    from ragas.llms import LangchainLLMWrapper
     from ragas.metrics import context_recall, faithfulness
     from ragas.run_config import RunConfig
     from sentence_transformers import SentenceTransformer
-    from tenacity import retry, stop_after_attempt, wait_exponential
 
     from src.agents.graph import RAGGraph
+    from src.config.model_registry import ModelRegistry
     from src.evaluation.metrics import compute_rouge_l, semantic_similarity
 
-    # --- Rate-limit safe Ragas wrappers (tenacity replaces asyncio.sleep) ---
-    gemini_lock = asyncio.Lock()
+    # --- Initialise the RAG system and evaluator LLM ---
+    # Use the same provider as the main pipeline (set by .env).
+    registry = ModelRegistry()
+    evaluator_langchain_llm = registry.get_llm(complexity="simple")
 
-    class SafeRagasLLM(BaseRagasLLM):
-        def __init__(self, llm):
-            self.langchain_llm = llm
+    # Ragas 0.2 wraps any LangChain BaseChatModel directly.
+    wrapped_llm = LangchainLLMWrapper(evaluator_langchain_llm)
 
-        def get_temperature(self, temperature=None):
-            return 0
-
-        def generate_text(self, prompt, n=1, temperature=1e-8, callbacks=None, **kwargs):
-            return asyncio.run(
-                self.agenerate_text(prompt, n, temperature, callbacks, **kwargs)
-            )
-
-        async def generate(self, prompts, n=1, temperature=1e-8, callbacks=None, **kwargs):
-            generations = []
-            for prompt in prompts:
-                text = await self.agenerate_text(prompt, n, temperature, callbacks, **kwargs)
-                generations.append([Generation(text=text)])
-            return LLMResult(generations=generations)
-
-        @retry(
-            wait=wait_exponential(min=5, max=60),
-            stop=stop_after_attempt(5),
-            reraise=True,
-        )
-        async def agenerate_text(self, prompt, n=1, temperature=1e-8, callbacks=None, **kwargs):
-            async with gemini_lock:
-                prompt_text = (
-                    prompt.to_string()
-                    if hasattr(prompt, "to_string")
-                    else (prompt.text if hasattr(prompt, "text") else str(prompt))
-                )
-                res = await self.langchain_llm.ainvoke(
-                    prompt_text, stop=kwargs.get("stop")
-                )
-                return res.content
-
-    class SafeRagasEmbeddings(BaseRagasEmbeddings):
-        def __init__(self, embeddings):
-            self.embeddings = embeddings
-
-        def embed_query(self, text):
-            return asyncio.run(self._embed([text], is_query=True))[0]
-
-        def embed_documents(self, texts):
-            return asyncio.run(self._embed(texts, is_query=False))
-
-        @retry(
-            wait=wait_exponential(min=5, max=60),
-            stop=stop_after_attempt(5),
-            reraise=True,
-        )
-        async def _embed(self, texts, is_query=False):
-            results = []
-            for text in texts:
-                async with gemini_lock:
-                    if is_query:
-                        res = await self.embeddings.aembed_query(text)
-                    else:
-                        res = await self.embeddings.aembed_documents([text])
-                        res = res[0]
-                    results.append(res)
-            return results
+    sim_model = SentenceTransformer("BAAI/bge-large-en-v1.5")
+    rag_system = RAGGraph()
 
     # --- Load test suite ---
     test_cases = _load_test_suite(test_suite_path)
     logger.info("Loaded %d test cases from %s", len(test_cases), test_suite_path)
+    print(f"--- Running inference on {len(test_cases)} questions ---")
 
-    # --- Initialise systems ---
-    gemini_llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-lite")
-    gemini_emb = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
-    evaluator_llm = SafeRagasLLM(gemini_llm)
-    evaluator_emb = SafeRagasEmbeddings(gemini_emb)
-
-    sim_model = SentenceTransformer("BAAI/bge-large-en-v1.5")
-
-    rag_system = RAGGraph()
-
-    # --- Run inference ---
-    ragas_data: Dict[str, List] = {
-        "question": [], "answer": [], "contexts": [], "ground_truth": []
-    }
     per_question_metrics: List[Dict] = []
+    ragas_samples: List[SingleTurnSample] = []
 
     for i, case in enumerate(test_cases):
         question = case["question"]
@@ -173,7 +103,7 @@ def run_evaluation(
         ground_truth = case.get("ground_truth", "")
         is_help = case.get("is_help", False)
 
-        logger.info("[%d/%d] Querying: %s", i + 1, len(test_cases), question[:80])
+        print(f"[{i + 1}/{len(test_cases)}] {question[:80]}")
 
         inputs = {
             "query": question,
@@ -212,6 +142,8 @@ def run_evaluation(
 
         per_question_metrics.append({
             "question": question,
+            "answer": answer,
+            "ground_truth": ground_truth,
             "expected_domain": expected_domain,
             "dominant_category": result.get("dominant_category", ""),
             "confidence": result.get("confidence", 0.0),
@@ -225,42 +157,55 @@ def run_evaluation(
             "retry_count": result.get("retry_count", 0),
         })
 
-        ragas_data["question"].append(question)
-        ragas_data["answer"].append(answer)
-        ragas_data["contexts"].append(context_texts)
-        ragas_data["ground_truth"].append(ground_truth)
+        # Build ragas 0.2 SingleTurnSample
+        # Field names changed: question->user_input, answer->response,
+        # contexts->retrieved_contexts, ground_truth->reference
+        ragas_samples.append(SingleTurnSample(
+            user_input=question,
+            response=answer,
+            retrieved_contexts=context_texts if context_texts else [""],
+            reference=ground_truth if ground_truth else "",
+        ))
 
         if i < len(test_cases) - 1:
-            logger.info("Sleeping 10s for rate-limit safety...")
-            time.sleep(10)
+            logger.debug("Sleeping 3s between queries...")
+            time.sleep(3)
 
-    # --- Ragas evaluation ---
-    dataset = Dataset.from_dict(ragas_data)
-    run_cfg = RunConfig(max_workers=1, timeout=900)
+    # --- Ragas 0.2 evaluation ---
+    eval_dataset = EvaluationDataset(samples=ragas_samples)
+    run_cfg = RunConfig(max_workers=1, timeout=300)
 
-    logger.info("Running Ragas faithfulness + context_recall...")
-    ragas_result = evaluate(
-        dataset,
-        metrics=[faithfulness, context_recall],
-        llm=evaluator_llm,
-        embeddings=evaluator_emb,
-        run_config=run_cfg,
-    )
-    ragas_scores = ragas_result.to_pandas().to_dict(orient="records")
+    ragas_scores_per_q: List[Dict] = []
+    try:
+        print("--- Running Ragas faithfulness + context_recall ---")
+        ragas_result = evaluate(
+            dataset=eval_dataset,
+            metrics=[faithfulness, context_recall],
+            llm=wrapped_llm,
+            run_config=run_cfg,
+        )
+        # ragas 0.2 returns a dict-like EvaluationResult; convert to list of dicts
+        ragas_df = ragas_result.to_pandas()
+        ragas_scores_per_q = ragas_df.to_dict(orient="records")
+    except Exception:
+        logger.exception(
+            "Ragas evaluation failed — continuing with non-LLM metrics only"
+        )
 
     # Merge Ragas scores into per-question metrics
-    for i, row in enumerate(ragas_scores):
+    for i, row in enumerate(ragas_scores_per_q):
         if i < len(per_question_metrics):
             per_question_metrics[i]["faithfulness"] = row.get("faithfulness")
             per_question_metrics[i]["context_recall"] = row.get("context_recall")
 
     # --- Aggregate ---
-    def _avg(key):
+    def _avg(key: str) -> float | None:
         vals = [r[key] for r in per_question_metrics if r.get(key) is not None]
         return round(sum(vals) / len(vals), 4) if vals else None
 
     summary = {
         "n_questions": len(per_question_metrics),
+        "provider": registry.provider_name,
         "avg_faithfulness": _avg("faithfulness"),
         "avg_context_recall": _avg("context_recall"),
         "avg_semantic_similarity": _avg("semantic_similarity"),
