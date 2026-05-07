@@ -15,11 +15,11 @@ graph TD
     end
 
     subgraph Domain
-        GuardIn[Guard Agent\nInput Validation]
-        GuardIn -->|safe| Router[Router Agent\nMLP Classifier]
+        GuardIn[Guard Agent<br>Input Validation]
+        GuardIn -->|safe| Router[Router Agent<br>MLP Classifier]
         GuardIn -->|blocked| Response
-        Router -->|category_probs| Retrieval[Retrieval Agent\nWeighted Search + Reranker]
-        Retrieval --> Synthesis[Synthesis Agent\nGrounded LLM]
+        Router -->|category_probs| Retrieval[Retrieval Agent<br>Weighted Search + Reranker]
+        Retrieval --> Synthesis[Synthesis Agent<br>Grounded LLM]
     end
 
     subgraph Tool
@@ -30,14 +30,14 @@ graph TD
     end
 
     subgraph Evaluation
-        Synthesis --> Critic[Critic Agent\nFaithfulness Check]
+        Synthesis --> Critic[Critic Agent<br>Faithfulness Check]
         Critic -->|approved| GuardOut
         Critic -.->|rejected + retries left| Retrieval
     end
 
     subgraph Output
-        GuardOut[Guard Agent\nOutput Validation]
-        GuardOut --> Action[Action Agent\nAudit Log + Webhook]
+        GuardOut[Guard Agent<br>Output Validation]
+        GuardOut --> Action[Action Agent<br>Audit Log + Webhook]
         Action --> Response
     end
 ```
@@ -128,7 +128,6 @@ graph TD
 ├── models/                      # Trained MLP weights (gitignored)
 ├── chat.py                      # Interactive CLI interface
 ├── setup.py                     # Bootstrap: MLP training + Qdrant indexing
-├── evaluate.py                  # Thin wrapper → src/evaluation/eval_runner.py
 ├── smoke_test.py                # Legacy two-query smoke test
 ├── run.sh                       # All-in-one setup and launch script
 ├── Dockerfile                   # Multi-stage CPU-only build (~1.5 GB)
@@ -156,7 +155,7 @@ poetry install
 To install optional LLM provider packages alongside the core dependencies:
 
 ```bash
-# Install one provider
+# Install one provider: gemini, claude, groq, openrouter, kimi, ollama
 poetry install --extras groq
 
 # Install all providers at once
@@ -368,8 +367,6 @@ Requires `GOOGLE_API_KEY` in `.env` for the Ragas LLM-based metrics (faithfulnes
 | `token_count` | LLM metadata | Total tokens consumed by the LLM |
 | `semantic_similarity` | `bge-large-en-v1.5` cosine | Cosine similarity between generated and reference answer |
 | `rouge_l` | `rouge-score` | ROUGE-L F1 between generated and reference answer |
-
-The backward-compatible entry point (`poetry run python evaluate.py`) delegates to the same runner.
 
 ## Testing
 
