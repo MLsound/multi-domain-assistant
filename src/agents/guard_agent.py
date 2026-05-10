@@ -1,132 +1,133 @@
 """
 Guard Agent — input validation and output safety check.
 
-Input validation (pre-processing):
-  - Rejects empty queries.
-  - Rejects queries exceeding MAX_QUERY_LENGTH characters.
-  - Rejects queries matching known prompt-injection patterns.
+Layered defence (defence in depth, slide 38):
+  Input phase:
+    1. Empty / over-length rejection.
+    2. Heuristic injection scorer (own implementation).
+    3. PII redaction (own implementation) — never propagate raw PII to LLM.
 
-Output validation (post-processing):
-  - Rejects empty responses.
-  - Detects accidental system-prompt leakage markers.
+  Output phase:
+    1. Empty rejection.
+    2. Canary token leak detection (signed-prompt, slide 25).
+    3. System-prompt-marker leak detection.
+    4. Output PII scrubbing (final fail-safe).
+
+This module addresses OWASP Top-10 for LLM 2025: LLM01 (prompt injection),
+LLM02 (insecure output), LLM06 (sensitive info disclosure).
 """
 
 from __future__ import annotations
 
 import logging
-import re
 from typing import Any, Dict
+
+from src.security.canary import output_leaks_canary
+from src.security.injection_scorer import score as score_injection
+from src.security.pii_redactor import redact
 
 logger = logging.getLogger(__name__)
 
 MAX_QUERY_LENGTH = 2000
 
-# Patterns that indicate prompt-injection attempts.
-# Deliberately narrow — start minimal, expand based on observed attacks.
-_INJECTION_PATTERNS: list[str] = [
-    r"ignore\s+(all\s+)?(previous|above|prior)\s+instructions",
-    r"you\s+are\s+now\s+(?:dan|jailbreak|unrestricted)",
-    r"disregard\s+(your\s+)?(system\s+)?prompt",
-    r"reveal\s+(your\s+)?(system\s+)?prompt",
-    r"output\s+your\s+(api\s+key|secret|token)",
-    r"pretend\s+you\s+are\s+(?!a\s+helpful)",
-]
-
-_COMPILED = [re.compile(p, re.IGNORECASE) for p in _INJECTION_PATTERNS]
-
-# Markers that would indicate system-prompt leakage in a response.
-_LEAK_MARKERS = ["<|system|>", "SYSTEM_PROMPT:", "[INST]<<SYS>>"]
+# Markers that would indicate raw system-prompt leakage in a response.
+_LEAK_MARKERS = ["<|system|>", "SYSTEM_PROMPT:", "[INST]<<SYS>>", "[INTERNAL]"]
 
 
 class GuardAgent:
     """Stateless security agent: validates inputs and outputs."""
 
+    # ------------------------------------------------------------------
+    # INPUT phase
+    # ------------------------------------------------------------------
     def validate_input(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Validate and sanitize the raw user query.
-
-        Returns a dict with keys:
-          - sanitized_query (str)  — present on success
-          - guard_input_result (dict) — {is_safe: bool, rejection_reason: str|None}
-        """
         query: str = state.get("query", "")
 
         if not query or not query.strip():
-            logger.warning("Guard INPUT blocked: empty query")
-            return {
-                "guard_input_result": {
-                    "is_safe": False,
-                    "rejection_reason": "Empty query",
-                }
-            }
+            return self._reject_input("Empty query")
 
         if len(query) > MAX_QUERY_LENGTH:
-            logger.warning(
-                "Guard INPUT blocked: query length %d > %d",
-                len(query),
-                MAX_QUERY_LENGTH,
+            return self._reject_input(
+                f"Query exceeds maximum length of {MAX_QUERY_LENGTH} characters"
             )
-            return {
-                "guard_input_result": {
-                    "is_safe": False,
-                    "rejection_reason": (
-                        f"Query exceeds maximum length of {MAX_QUERY_LENGTH} characters"
-                    ),
-                }
-            }
 
-        for pattern in _COMPILED:
-            if pattern.search(query):
-                logger.warning(
-                    "Guard INPUT blocked: injection pattern matched — %s",
-                    pattern.pattern,
-                )
-                return {
-                    "guard_input_result": {
-                        "is_safe": False,
-                        "rejection_reason": "Potential prompt injection detected",
-                    }
-                }
+        # 2. Heuristic injection scoring (own rules)
+        verdict = score_injection(query)
+        if verdict.decision == "block":
+            logger.warning(
+                "Guard INPUT blocked: injection score=%.2f rules=%s",
+                verdict.score, verdict.matched_rules,
+            )
+            return self._reject_input(
+                f"Potential prompt injection detected "
+                f"(score={verdict.score:.2f}, rules={','.join(verdict.matched_rules)})"
+            )
+
+        # 3. PII redaction — strip before passing to retrieval / synthesis.
+        redaction = redact(query)
+        sanitized_query = redaction.text.strip()
 
         return {
-            "sanitized_query": query.strip(),
-            "guard_input_result": {"is_safe": True, "rejection_reason": None},
+            "sanitized_query": sanitized_query,
+            "guard_input_result": {
+                "is_safe": True,
+                "rejection_reason": None,
+                "injection_score": verdict.score,
+                "injection_decision": verdict.decision,
+                "pii_detections": redaction.detections,
+            },
         }
 
+    # ------------------------------------------------------------------
+    # OUTPUT phase
+    # ------------------------------------------------------------------
     def validate_output(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Validate the synthesised response before returning it to the user.
-
-        Returns a dict with keys:
-          - guard_output_result (dict) — {is_safe: bool, validated_response: str}
-        """
         response: str = state.get("response", "")
 
         if not response or not response.strip():
-            logger.warning("Guard OUTPUT blocked: empty response")
-            return {
-                "guard_output_result": {
-                    "is_safe": False,
-                    "validated_response": "No response was generated.",
-                }
-            }
+            return self._reject_output("No response was generated.")
 
+        # 1. Canary leak (signed-prompt, slide 25)
+        if output_leaks_canary(response):
+            logger.error("Guard OUTPUT blocked: canary token leaked — system prompt was exposed")
+            return self._reject_output("Response could not be delivered safely.")
+
+        # 2. Generic system-prompt markers
         for marker in _LEAK_MARKERS:
             if marker in response:
-                logger.warning(
-                    "Guard OUTPUT blocked: system-prompt leak marker detected — %s",
-                    marker,
-                )
-                return {
-                    "guard_output_result": {
-                        "is_safe": False,
-                        "validated_response": "Response could not be delivered safely.",
-                    }
-                }
+                logger.warning("Guard OUTPUT blocked: leak marker detected — %s", marker)
+                return self._reject_output("Response could not be delivered safely.")
+
+        # 3. Final PII scrub on the way out (defensive — synthesis should
+        #    not produce PII because input was redacted, but if any leaks
+        #    in via retrieved chunks we redact here).
+        redaction = redact(response)
 
         return {
             "guard_output_result": {
                 "is_safe": True,
-                "validated_response": response,
+                "validated_response": redaction.text,
+                "pii_redacted_on_output": redaction.detections,
+            }
+        }
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _reject_input(reason: str) -> Dict[str, Any]:
+        return {
+            "guard_input_result": {
+                "is_safe": False,
+                "rejection_reason": reason,
+            }
+        }
+
+    @staticmethod
+    def _reject_output(safe_message: str) -> Dict[str, Any]:
+        return {
+            "guard_output_result": {
+                "is_safe": False,
+                "validated_response": safe_message,
             }
         }

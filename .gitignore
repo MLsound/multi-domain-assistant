@@ -46,3 +46,10 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Auth DB (created at runtime, contains user credentials)
+data/auth.db
+data/auth.db-journal
+
+# Editor / Claude session
+.claude/

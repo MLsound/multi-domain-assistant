@@ -2,9 +2,11 @@
 FastAPI application for the Knowledge Assistant.
 
 Endpoints:
-  POST /query   — Submit a query and receive a grounded response.
-  GET  /health  — Qdrant connectivity + active provider status.
-  GET  /metrics — Aggregated request metrics.
+  POST /auth/register, /auth/login, GET /auth/me  — authentication
+  POST /query                                     — protected, JWT required
+  GET  /health                                    — public health check
+  GET  /metrics                                   — public aggregate metrics
+  GET  /me/queries                                — per-user query history
 """
 
 from __future__ import annotations
@@ -13,17 +15,23 @@ import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import Any, Dict
+from datetime import datetime, timezone
+from typing import Any, Dict, List
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 
-from src.api.schemas import HealthResponse, QueryRequest, QueryResponse
+from src.api.schemas import HealthResponse, QueryRecordOut, QueryRequest, QueryResponse
+from src.auth.database import get_db, init_db
+from src.auth.deps import get_current_user
+from src.auth.models import QueryRecord, User
+from src.auth.router import router as auth_router
 from src.config.settings import settings
+from src.security.rate_limiter import limiter
 
 load_dotenv()
-
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -34,9 +42,11 @@ _metrics: Dict[str, Any] = {
     "total_latency_ms": 0.0,
     "errors": 0,
     "cache_hits": 0,
+    "blocked_by_guard": 0,
+    "rate_limited": 0,
+    "pii_redacted": 0,
 }
 
-# Lazy-initialised graph (populated in lifespan)
 _rag_system = None
 
 
@@ -44,6 +54,9 @@ _rag_system = None
 async def lifespan(app: FastAPI):
     """Initialise heavy resources once at startup."""
     global _rag_system
+    init_db()
+    logger.info("Auth DB ready")
+
     logger.info("Initialising RAGGraph...")
     from src.agents.graph import RAGGraph
 
@@ -55,12 +68,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Knowledge Assistant API",
-    version="0.2.0",
-    description="Multi-agent Agentic RAG for sustainable energy and smart building knowledge.",
+    version="0.3.0",
+    description=(
+        "Multi-agent Agentic RAG for sustainable energy and smart building "
+        "knowledge. Hardened against OWASP Top-10 LLM threats; user-aware."
+    ),
     lifespan=lifespan,
 )
 
-# CORS — allow localhost origins for development / demo
+app.include_router(auth_router)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -74,38 +91,55 @@ app.add_middleware(
 )
 
 
-# ---------------------------------------------------------------------------
-# Endpoints
-# ---------------------------------------------------------------------------
-
 @app.get("/")
 async def root():
-    """Root endpoint — returns API name and links to docs and health check."""
     return {
         "name": "Knowledge Assistant API",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "docs": "/docs",
         "health": "/health",
-        "metrics": "/metrics",
-        "usage": "POST /query with JSON body: {\"query\": \"your question here\"}",
+        "auth": ["/auth/register", "/auth/login", "/auth/me"],
+        "query": "POST /query (Bearer token required)",
     }
 
 
+# ---------------------------------------------------------------------------
+# Protected query endpoint
+# ---------------------------------------------------------------------------
 @app.post("/query", response_model=QueryResponse)
-async def query(req: QueryRequest):
-    """Submit a natural-language query and receive a grounded response."""
+async def query(
+    req: QueryRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     global _metrics
+
+    # Rate limit (LLM04 mitigation)
+    allowed, retry_after = limiter.allow(user.id)
+    if not allowed:
+        _metrics["rate_limited"] += 1
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded. Retry in {retry_after}s.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    # Daily quota
+    if user.queries_today >= user.quota_queries_per_day:
+        raise HTTPException(status_code=429, detail="Daily query quota exceeded")
 
     t0 = time.perf_counter()
     try:
+        # Session id is namespaced by user so two users cannot share state.
+        scoped_session = f"u{user.id}:{req.session_id or 'default'}"
+
         inputs = {
             "query": req.query,
-            "session_id": req.session_id or "anonymous",
+            "session_id": scoped_session,
             "is_help_section": req.is_help_override,
             "history": [],
             "retry_count": 0,
             "from_cache": False,
-            # Provide sensible defaults for all optional state fields
             "sanitized_query": "",
             "guard_input_result": {},
             "guard_output_result": {},
@@ -122,7 +156,6 @@ async def query(req: QueryRequest):
             "action_result": {},
         }
 
-        # Run graph in a thread to avoid blocking the asyncio event loop
         result = await asyncio.wait_for(
             asyncio.to_thread(_rag_system.app.invoke, inputs),
             timeout=30.0,
@@ -134,12 +167,30 @@ async def query(req: QueryRequest):
         if result.get("from_cache"):
             _metrics["cache_hits"] += 1
 
-        logger.info(
-            "Query completed — latency=%.0fms provider=%s cache=%s",
-            latency_ms,
-            _rag_system.provider_name,
-            result.get("from_cache"),
+        guard_in = result.get("guard_input_result") or {}
+        guard_out = result.get("guard_output_result") or {}
+        blocked = not guard_in.get("is_safe", True)
+        if blocked:
+            _metrics["blocked_by_guard"] += 1
+        pii_in = guard_in.get("pii_detections") or []
+        pii_out = guard_out.get("pii_redacted_on_output") or []
+        if pii_in or pii_out:
+            _metrics["pii_redacted"] += 1
+
+        # Per-user persistent log
+        user.queries_today += 1
+        rec = QueryRecord(
+            user_id=user.id,
+            session_id=scoped_session,
+            query=req.query[:1000],
+            response_preview=(result.get("response", "") or "")[:500],
+            dominant_category=result.get("dominant_category", ""),
+            confidence=result.get("confidence", 0.0),
+            latency_ms=latency_ms,
+            blocked_by_guard=blocked,
         )
+        db.add(rec)
+        db.commit()
 
         return QueryResponse(
             response=result.get("response", ""),
@@ -151,21 +202,41 @@ async def query(req: QueryRequest):
             token_count=result.get("token_count", 0),
             retry_count=result.get("retry_count", 0),
             from_cache=result.get("from_cache", False),
+            injection_score=guard_in.get("injection_score", 0.0),
+            injection_decision=guard_in.get("injection_decision", "allow"),
+            pii_redacted_count=len(pii_in) + len(pii_out),
         )
 
     except asyncio.TimeoutError:
         _metrics["errors"] += 1
-        logger.error("Query timed out after 30s")
         raise HTTPException(status_code=504, detail="Request timed out after 30 seconds")
+    except HTTPException:
+        raise
     except Exception as exc:
         _metrics["errors"] += 1
         logger.exception("Unhandled error processing query")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@app.get("/me/queries", response_model=List[QueryRecordOut])
+def my_queries(
+    limit: int = 50,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return the authenticated user's own query history."""
+    rows = (
+        db.query(QueryRecord)
+        .filter(QueryRecord.user_id == user.id)
+        .order_by(QueryRecord.created_at.desc())
+        .limit(min(limit, 200))
+        .all()
+    )
+    return [QueryRecordOut.model_validate(r) for r in rows]
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health():
-    """Check system health: Qdrant connectivity and active LLM provider."""
     qdrant_ok = False
     try:
         from qdrant_client import QdrantClient
@@ -178,23 +249,25 @@ async def health():
 
     status = "ok" if qdrant_ok else "degraded"
     provider = _rag_system.provider_name if _rag_system else "not_initialised"
-
     return HealthResponse(
         status=status,
         qdrant_connected=qdrant_ok,
         active_provider=provider,
+        timestamp=datetime.now(timezone.utc).isoformat(),
     )
 
 
 @app.get("/metrics")
 async def metrics():
-    """Return aggregated request metrics since last process start."""
     n = _metrics["total_requests"]
     return {
         "total_requests": n,
         "avg_latency_ms": round(_metrics["total_latency_ms"] / n, 2) if n else 0.0,
         "error_rate": round(_metrics["errors"] / n, 4) if n else 0.0,
         "cache_hit_rate": round(_metrics["cache_hits"] / n, 4) if n else 0.0,
+        "blocked_by_guard_rate": round(_metrics["blocked_by_guard"] / n, 4) if n else 0.0,
+        "rate_limited_count": _metrics["rate_limited"],
+        "pii_redacted_count": _metrics["pii_redacted"],
         "total_errors": _metrics["errors"],
         "total_cache_hits": _metrics["cache_hits"],
     }

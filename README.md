@@ -1,6 +1,10 @@
 # Knowledge Assistant
 
-A multi-agent Agentic RAG system for the sustainable energy and smart building knowledge domain. The system routes natural-language queries through a seven-agent LangGraph pipeline — classifier, retriever-ranker, synthesiser, faithfulness critic, security guard, session cache, and automated action — and exposes a FastAPI REST interface.
+> FIUBA · Maestría en IA · PNL III (2026) — Grupo 1: Sarmiento · Lloveras · Cuenca
+
+A multi-agent Agentic RAG system for the sustainable energy and smart building knowledge domain. The system routes natural-language queries through a seven-agent LangGraph pipeline — classifier, retriever-ranker, synthesiser, faithfulness critic, security guard, session cache, and automated action — and exposes a FastAPI REST interface with **JWT-based registration / login** and **per-user isolation**.
+
+> ⚠️ **Course constraint honoured:** every flow-critical component (auth, guardrails, alignment) is hand-rolled — no auth-as-a-service framework, no plug-and-play guardrails suite. See `docs/informe_maestria.md` for the rationale.
 
 ## Architecture
 
@@ -41,6 +45,64 @@ graph TD
         Action --> Response
     end
 ```
+
+## Deliverables (FIUBA PNL III)
+
+| Artifact | Path |
+|---|---|
+| Code (this repo) | branch `dev-jorge` |
+| Technical report (PDF) | `docs/informe_maestria.pdf` |
+| Presentation (PPTX) | `docs/presentation_FIUBA.pptx` |
+| Governance pack (NIST AI RMF) | `docs/governance/` |
+| Constitutional principles | `src/alignment/constitution.yaml` |
+| Red-team test set | `tests/test_security.py` |
+
+Regenerate the PPTX or PDF after a code change:
+
+```bash
+python scripts/generate_presentation.py     # → docs/presentation_FIUBA.pptx
+python scripts/generate_report_pdf.py       # → docs/informe_maestria.pdf
+```
+
+## Authentication
+
+Endpoints (own implementation, `src/auth/`):
+
+```bash
+# 1. Register
+curl -X POST http://localhost:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jorge@fiuba.ar","password":"Strong-Pass-1","full_name":"Jorge Cuenca"}'
+
+# 2. Login → JWT (60 min)
+TOKEN=$(curl -s -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jorge@fiuba.ar","password":"Strong-Pass-1"}' | jq -r .access_token)
+
+# 3. Protected query
+curl -X POST http://localhost:8000/query \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"query":"What are NFPA 855 clearance requirements for BESS?"}'
+
+# 4. Per-user history
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/me/queries
+```
+
+Set `AUTH_JWT_SECRET` in `.env` (generate with `python -c "import secrets; print(secrets.token_urlsafe(48))"`).
+The user/quota DB defaults to `sqlite:///data/auth.db`; switch to PostgreSQL via `AUTH_DATABASE_URL`.
+
+## Security (OWASP Top-10 LLM 2025)
+
+| Code | Risk | Control |
+|---|---|---|
+| LLM01 | Prompt injection | `src/security/injection_scorer.py` (heuristic, weighted, EN+ES) + canary token |
+| LLM02 | Insecure output | output PII scrub + leak markers |
+| LLM04 | DoS | sliding-window limiter + per-user daily quota |
+| LLM06 | Sensitive info disclosure | `src/security/pii_redactor.py` (DNI, CUIT, email, IP, API keys) |
+| LLM08 | Excessive agency | ActionAgent only writes audit logs / read-only webhooks |
+| LLM10 | Model theft | rate limit + quota |
+
+The red-team suite is in `tests/test_security.py` and asserts `injection_block_rate ≥ 0.90`.
 
 ## Core Features
 
