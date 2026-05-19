@@ -11,6 +11,9 @@ __pycache__/
 dist/
 build/
 
+# Ruff cache
+.ruff_cache/
+
 # Virtual environments
 .venv/
 venv/
