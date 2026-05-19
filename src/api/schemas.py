@@ -4,6 +4,7 @@ Pydantic schemas for the FastAPI endpoints.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -19,20 +20,37 @@ class QueryRequest(BaseModel):
 
 
 class QueryResponse(BaseModel):
-    response: str = Field(..., description="Generated answer")
-    sources_cited: List[str] = Field(default_factory=list, description="Source document IDs used")
-    category_probs: Dict[str, float] = Field(
-        default_factory=dict, description="Domain probability distribution"
-    )
-    dominant_category: str = Field("", description="Highest-probability domain")
-    confidence: float = Field(0.0, description="Router confidence score")
-    retrieval_time_ms: float = Field(0.0, description="Qdrant retrieval latency in ms")
-    token_count: int = Field(0, description="LLM tokens consumed")
-    retry_count: int = Field(0, description="Number of critic-triggered retries")
-    from_cache: bool = Field(False, description="True if response was served from semantic cache")
+    response: str
+    sources_cited: List[str] = Field(default_factory=list)
+    category_probs: Dict[str, float] = Field(default_factory=dict)
+    dominant_category: str = ""
+    confidence: float = 0.0
+    retrieval_time_ms: float = 0.0
+    token_count: int = 0
+    retry_count: int = 0
+    from_cache: bool = False
+    # Security telemetry surfaced to the client (helps the demo presentation)
+    injection_score: float = 0.0
+    injection_decision: str = "allow"
+    pii_redacted_count: int = 0
 
 
 class HealthResponse(BaseModel):
-    status: str = Field(..., description="'ok' or 'degraded'")
+    status: str
     qdrant_connected: bool
-    active_provider: str = Field(..., description="Active LLM provider name")
+    active_provider: str
+    timestamp: str
+
+
+class QueryRecordOut(BaseModel):
+    id: int
+    session_id: str
+    query: str
+    response_preview: str
+    dominant_category: str
+    confidence: float
+    latency_ms: float
+    blocked_by_guard: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

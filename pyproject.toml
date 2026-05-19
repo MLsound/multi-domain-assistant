@@ -31,6 +31,19 @@ tenacity = ">=8.3.0"
 rouge-score = ">=0.1.2"
 langchain-text-splitters = ">=0.3.0"
 
+# --- Auth + security stack (own implementation, no auth-as-a-service) ---
+sqlalchemy = ">=2.0.0"
+"python-jose" = {version = ">=3.3.0", extras = ["cryptography"]}
+bcrypt = ">=4.0.0"
+"email-validator" = ">=2.0.0"
+pyyaml = ">=6.0"
+"python-multipart" = ">=0.0.9"
+
+# --- Reporting / presentation deliverables ---
+"python-pptx" = {version = ">=0.6.23", optional = true}
+"weasyprint" = {version = ">=62.0", optional = true}
+markdown = {version = ">=3.5", optional = true}
+
 # --- Optional provider extras ---
 langchain-anthropic = {version = ">=0.2.0", optional = true}
 langchain-groq = {version = ">=0.2.0", optional = true}
@@ -51,6 +64,7 @@ all-providers = [
     "langchain-moonshot",
     "langchain-ollama",
 ]
+docs = ["python-pptx", "weasyprint", "markdown"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0.0"

@@ -11,6 +11,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from src.auth.models import User
+
 
 def _make_mock_result(response: str = "Test response.", from_cache: bool = False) -> dict:
     return {
@@ -58,8 +60,18 @@ def client():
         mock_registry.get_llm.return_value = mock_llm
 
         from src.api.main import app
+        from src.auth import database as db_mod
+        from src.auth.deps import get_current_user
+
+        fake_user = User(id=1, email="test@example.com", full_name="Test", hashed_password="h", role="user", queries_today=0, quota_queries_per_day=100)
+
+        app.dependency_overrides[get_current_user] = lambda: fake_user
+        app.dependency_overrides[db_mod.get_db] = lambda: MagicMock()
+
         with TestClient(app, raise_server_exceptions=False) as c:
             yield c
+
+        app.dependency_overrides.clear()
 
 
 def test_health_endpoint_returns_200(client: TestClient) -> None:
