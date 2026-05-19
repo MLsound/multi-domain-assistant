@@ -13,8 +13,6 @@ from __future__ import annotations
 
 import time
 
-import pytest
-
 from src.security.canary import (
     get_canary,
     output_leaks_canary,
