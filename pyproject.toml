@@ -34,7 +34,7 @@ langchain-text-splitters = ">=0.3.0"
 # --- Auth + security stack (own implementation, no auth-as-a-service) ---
 sqlalchemy = ">=2.0.0"
 "python-jose" = {version = ">=3.3.0", extras = ["cryptography"]}
-"passlib" = {version = ">=1.7.4", extras = ["bcrypt"]}
+bcrypt = ">=4.0.0"
 "email-validator" = ">=2.0.0"
 pyyaml = ">=6.0"
 "python-multipart" = ">=0.0.9"

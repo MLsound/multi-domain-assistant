@@ -1,6 +1,9 @@
 """
 Password hashing (bcrypt) and JWT issuance/verification.
 
+Uses the modern `bcrypt` library directly (passlib is unmaintained and
+incompatible with bcrypt>=4.1.0).
+
 Why bcrypt and not argon2: bcrypt is older and more battle-tested in
 educational contexts; argon2 is preferable in production but both meet
 the assignment's requirements.
@@ -15,23 +18,21 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 JWT_SECRET = os.getenv("AUTH_JWT_SECRET", "CHANGE-ME-IN-PROD-this-is-only-a-dev-default")
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("AUTH_ACCESS_TOKEN_MINUTES", "60"))
 
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 def hash_password(plain: str) -> str:
-    return _pwd.hash(plain)
+    return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     try:
-        return _pwd.verify(plain, hashed)
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
     except Exception:
         return False
 
