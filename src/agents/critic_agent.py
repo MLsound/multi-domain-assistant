@@ -18,6 +18,8 @@ import json
 import logging
 from typing import Any, Dict
 
+import mlflow
+
 from langchain_core.messages import HumanMessage, SystemMessage
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -67,6 +69,7 @@ class CriticAgent:
     def __init__(self, model_registry: ModelRegistry) -> None:
         self.registry = model_registry
 
+    @mlflow.trace(name="critic")
     def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Evaluate the synthesised response for faithfulness.

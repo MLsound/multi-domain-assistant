@@ -44,7 +44,7 @@ The system answers questions inside the **sustainable energy / smart-building** 
 | `users` table | `data/auth.db` | Until user requests deletion |
 | `query_records` | `data/auth.db` | 180 days, then truncate |
 | `logs/audit.jsonl` | local FS | 90 days, then rotate |
-| `logs/agent_traces.jsonl` (when enabled) | local FS | 30 days |
+| `mlflow.db` (traces + runs) | local FS / MLflow server | 90 days, then archive |
 
 PII detected on input/output is **not** stored verbatim; only aggregate counts (`{"type": "EMAIL", "count": 1}`) are persisted.
 

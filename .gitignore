@@ -56,3 +56,14 @@ data/auth.db-journal
 
 # Editor / Claude session
 .claude/
+
+# Opencode session
+.opencode/
+
+# Mlflow
+mlruns/
+mlflow.db
+
+# Other files
+*.log
+*.pdf

@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
+import mlflow
+
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -24,6 +26,7 @@ logger = logging.getLogger(__name__)
 class ActionAgent:
     """Executes automated post-response output actions."""
 
+    @mlflow.trace(name="action")
     def execute(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Write audit log and optionally fire a webhook.

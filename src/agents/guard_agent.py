@@ -22,6 +22,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict
 
+import mlflow
+
 from src.security.canary import output_leaks_canary
 from src.security.injection_scorer import score as score_injection
 from src.security.pii_redactor import redact
@@ -40,6 +42,7 @@ class GuardAgent:
     # ------------------------------------------------------------------
     # INPUT phase
     # ------------------------------------------------------------------
+    @mlflow.trace(name="guard_input")
     def validate_input(self, state: Dict[str, Any]) -> Dict[str, Any]:
         query: str = state.get("query", "")
 
@@ -81,6 +84,7 @@ class GuardAgent:
     # ------------------------------------------------------------------
     # OUTPUT phase
     # ------------------------------------------------------------------
+    @mlflow.trace(name="guard_output")
     def validate_output(self, state: Dict[str, Any]) -> Dict[str, Any]:
         response: str = state.get("response", "")
 
