@@ -67,3 +67,6 @@ mlflow.db
 # Other files
 *.log
 *.pdf
+
+# Other folders
+varios/
