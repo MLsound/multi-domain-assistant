@@ -144,28 +144,23 @@ if ($LASTEXITCODE -ne 0) { Fatal "poetry install failed." }
 Info "Dependencies ready."
 
 # ---------------------------------------------------------------------------
-# Step 3: Start Qdrant
+# Step 3: Start Qdrant + MLflow via Docker Compose
 # ---------------------------------------------------------------------------
-Info "Step 3: Starting Qdrant vector database..."
+Info "Step 3: Starting Qdrant + MLflow via Docker Compose..."
 
-$qdrantRunning = docker ps -q -f name=qdrant_rag
-if ($qdrantRunning) {
-    Info "Qdrant container 'qdrant_rag' is already running."
-} else {
-    $qdrantExists = docker ps -aq -f name=qdrant_rag
-    if ($qdrantExists) {
-        Info "Starting existing Qdrant container..."
-        docker start qdrant_rag
-    } else {
-        Info "Creating and starting new Qdrant container..."
-        docker run -d -p 6333:6333 --name qdrant_rag qdrant/qdrant
-    }
-    if ($LASTEXITCODE -ne 0) { Fatal "Failed to start Qdrant container." }
-}
+# Remove orphaned containers from previous docker run commands (ignore if not found)
+$ErrorActionPreference = "SilentlyContinue"
+docker rm -f mlflow_server 2>&1 | Out-Null
+docker rm -f qdrant_rag 2>&1 | Out-Null
+$ErrorActionPreference = "Stop"
+
+docker compose up -d --remove-orphans qdrant mlflow
+if ($LASTEXITCODE -ne 0) { Fatal "docker compose up failed." }
 
 Info "Waiting for Qdrant to be ready..."
 $maxWait = 30
 $waited  = 0
+$qdrantReady = $false
 do {
     Start-Sleep -Seconds 2
     $waited += 2
@@ -178,8 +173,39 @@ do {
     if (-not $qdrantReady) { Write-Host "  Qdrant not yet ready - retrying..." }
 } while (-not $qdrantReady -and $waited -lt $maxWait)
 
-if (-not $qdrantReady) { Fatal "Qdrant did not become ready within ${maxWait}s." }
+if (-not $qdrantReady) { Fatal "Qdrant did not become ready within $($maxWait)s." }
 Info "Qdrant is up at http://127.0.0.1:6333"
+
+Info "Waiting for MLflow to be ready..."
+$maxWait = 45
+$waited  = 0
+$mlflowReady = $false
+do {
+    Start-Sleep -Seconds 2
+    $waited += 2
+    try {
+        # MLflow /health endpoint is more reliable than root (which may redirect)
+        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:5000/health" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
+        $mlflowReady = ($resp.StatusCode -eq 200)
+    } catch {
+        # Fallback: check if port is listening (some MLflow versions lack /health)
+        try {
+            $tcp = New-Object System.Net.Sockets.TcpClient
+            $tcp.Connect("127.0.0.1", 5000)
+            $tcp.Close()
+            $mlflowReady = $true
+        } catch {
+            $mlflowReady = $false
+        }
+    }
+    if (-not $mlflowReady) { Write-Host "  MLflow not yet ready - retrying..." }
+} while (-not $mlflowReady -and $waited -lt $maxWait)
+
+if ($mlflowReady) {
+    Info "MLflow UI available at http://localhost:5000"
+} else {
+    Warn "MLflow did not become ready within $($maxWait)s - tracing will use local fallback."
+}
 
 # ---------------------------------------------------------------------------
 # Step 4: Index documents and train MLP router
@@ -222,9 +248,9 @@ $logFile = (Resolve-Path -Path "." ).Path + "\logs\api.log"
 # Start-Job runs inside the current PS session and dies with it.
 $uvicornProc = Start-Process `
     -FilePath "poetry" `
-    -ArgumentList "run", "uvicorn", "src.api.main:app",
-                  "--host", "0.0.0.0",
-                  "--port", "8000",
+    -ArgumentList "run", "uvicorn", "src.api.main:app", `
+                  "--host", "0.0.0.0", `
+                  "--port", "8000", `
                   "--log-level", "info" `
     -WorkingDirectory (Get-Location).Path `
     -RedirectStandardOutput $logFile `
@@ -235,7 +261,7 @@ $uvicornProc = Start-Process `
 $uvicornProc.Id | Out-File -FilePath "logs\api.pid" -Encoding ascii
 Info "API server starting (PID $($uvicornProc.Id)). Polling /health..."
 
-$maxWait = 60
+$maxWait = 120
 $waited  = 0
 $apiReady = $false
 do {
@@ -247,11 +273,11 @@ do {
     } catch {
         $apiReady = $false
     }
-    if (-not $apiReady) { Write-Host "  API not yet ready - retrying (${waited}s)..." }
+    if (-not $apiReady) { Write-Host "  API not yet ready - retrying ($($waited)s)..." }
 } while (-not $apiReady -and $waited -lt $maxWait)
 
 if (-not $apiReady) {
-    Warn "API did not respond within ${maxWait}s."
+    Warn "API did not respond within $($maxWait)s."
     Warn "Check logs\api.log and logs\api_err.log for details."
     Warn "You can start the API manually with:"
     Warn "  poetry run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload"
@@ -276,6 +302,7 @@ Write-Host "============================================================" -Foreg
 Write-Host ""
 Write-Host "  API base URL   : http://localhost:8000"
 Write-Host "  Qdrant console : http://localhost:6333/dashboard"
+Write-Host "  MLflow UI      : http://localhost:5000"
 Write-Host "  API docs       : http://localhost:8000/docs"
 Write-Host ""
 Write-Host "  Quick query (PowerShell):"
@@ -297,7 +324,7 @@ if ($uvicornProc -and -not $uvicornProc.HasExited) {
 } else {
     Write-Host "    Stop-Process -Id (Get-Content logs\api.pid)   # stop API server"
 }
-Write-Host "    docker stop qdrant_rag"
+Write-Host "    docker compose stop   # stop Qdrant + MLflow"
 Write-Host ""
 Write-Host "  API server log : logs\api.log"
 Write-Host "  API error log  : logs\api_err.log"

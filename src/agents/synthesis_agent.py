@@ -18,6 +18,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict
 
+import mlflow
+
 from langchain_core.messages import HumanMessage, SystemMessage
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -58,6 +60,7 @@ class SynthesisAgent:
     def __init__(self, model_registry: ModelRegistry) -> None:
         self.registry = model_registry
 
+    @mlflow.trace(name="synthesis")
     def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Generate a response from retrieved chunks.

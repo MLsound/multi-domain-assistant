@@ -2,7 +2,7 @@
 
 > FIUBA · Maestría en IA · PNL III (2026) — Grupo 1: Sarmiento · Lloveras · Cuenca
 
-A multi-agent Agentic RAG system for the sustainable energy and smart building knowledge domain. The system routes natural-language queries through a seven-agent LangGraph pipeline — classifier, retriever-ranker, synthesiser, faithfulness critic, security guard, session cache, and automated action — and exposes a FastAPI REST interface with **JWT-based registration / login** and **per-user isolation**.
+A multi-agent Agentic RAG system for the sustainable energy and smart building knowledge domain. The system routes natural-language queries through an eight-agent LangGraph pipeline — semantic cache, input guard, MLP classifier, retriever-ranker, synthesiser, faithfulness critic, output guard, and automated action — and exposes a FastAPI REST interface with **JWT-based registration / login**, **per-user isolation**, and **MLflow observability**.
 
 > ⚠️ **Course constraint honoured:** every flow-critical component (auth, guardrails, alignment) is hand-rolled — no auth-as-a-service framework, no plug-and-play guardrails suite. See `docs/informe_maestria.md` for the rationale.
 
@@ -130,6 +130,7 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 | API framework | FastAPI + uvicorn |
 | ML framework | PyTorch 2.2.2, sentence-transformers, LangChain |
 | Evaluation | Ragas (faithfulness, context_recall), ROUGE-L, semantic similarity |
+| Observability | MLflow (self-hosted) — tracing, experiment tracking, artifact logging |
 | Configuration | Pydantic `BaseSettings` |
 | Runtime | Python 3.11+, Poetry |
 
@@ -153,12 +154,12 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 │   ├── cache/
 │   │   └── semantic_cache.py    # Qdrant-backed query cache
 │   ├── config/
+│   │   ├── mlflow_config.py     # MLflowManager singleton — tracking lifecycle
 │   │   ├── model_registry.py    # Multi-provider LLM abstraction
 │   │   └── settings.py          # Pydantic BaseSettings — all configuration
 │   ├── evaluation/
-│   │   ├── eval_runner.py       # Full evaluation pipeline
-│   │   ├── metrics.py           # timing_decorator, ROUGE-L, semantic similarity
-│   │   └── tracer.py            # Per-agent JSONL tracer
+│   │   ├── eval_runner.py       # Full evaluation pipeline + MLflow tracking
+│   │   └── metrics.py           # timing_decorator, ROUGE-L, semantic similarity
 │   ├── memory/
 │   │   └── session_store.py     # In-memory session history with TTL
 │   ├── retrieval/
@@ -176,11 +177,13 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 ├── tests/
 │   ├── test_action.py           # ActionAgent (3 tests)
 │   ├── test_api.py              # FastAPI endpoints (4 tests)
+│   ├── test_auth.py             # Auth — password, JWT, register/login/me (8 tests)
 │   ├── test_critic.py           # CriticAgent (3 tests)
 │   ├── test_guard.py            # GuardAgent (6 tests)
 │   ├── test_integration.py      # End-to-end graph (3 tests)
 │   ├── test_model_registry.py   # Provider detection (4 tests)
 │   ├── test_router.py           # MLPRouter (6 tests)
+│   ├── test_security.py         # Red-team — injection, PII, canary (30 tests)
 │   └── test_synthesis.py        # SynthesisAgent (3 tests)
 ├── scripts/
 │   ├── download_local_model.py  # Ollama setup helper
@@ -193,7 +196,7 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 ├── smoke_test.py                # Legacy two-query smoke test
 ├── run.sh                       # All-in-one setup and launch script
 ├── Dockerfile                   # Multi-stage CPU-only build (~1.5 GB)
-├── docker-compose.yml           # Qdrant + API services
+├── docker-compose.yml           # Qdrant + MLflow + API services (dev: Qdrant + MLflow only)
 ├── .env.example                 # Environment variable template
 └── pyproject.toml               # Poetry dependencies + dev tools
 ```
@@ -204,7 +207,7 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 
 - Python 3.11 or 3.12
 - [Poetry](https://python-poetry.org/docs/) — dependency management
-- [Docker](https://docs.docker.com/get-docker/) — runs Qdrant vector database
+- [Docker](https://docs.docker.com/get-docker/) — runs Qdrant vector database and MLflow tracking server
 
 ### 1. Install dependencies
 
@@ -266,34 +269,62 @@ The active provider is always printed to stdout at startup:
 [ModelRegistry] Active provider: Groq (llama-3.1-8b-instant / llama-3.3-70b-versatile)
 ```
 
-### 3a. Quick Start — Automatic (`run.sh`)
+### 3a. Quick Start — Automatic (`run.sh` / `run.ps1`)
 
-The script checks prerequisites, starts Qdrant, indexes documents, trains the MLP router, runs the test suite, starts the FastAPI server, and prints a usage summary.
+The script checks prerequisites, starts Qdrant and MLflow via Docker Compose, indexes documents, trains the MLP router, runs the test suite, starts the FastAPI server, and prints a usage summary.
 
+**Windows (PowerShell):**
+```powershell
+.\run.ps1
+```
+
+**Linux / WSL (Bash):**
 ```bash
 chmod +x run.sh
 ./run.sh
 ```
 
-### 3b. Quick Start — Docker Compose
+### 3b. Quick Start — Docker Compose (All services)
 
-Runs both Qdrant and the API application in containers. Documents must be indexed separately because the corpus is mounted as a volume.
+Runs Qdrant, MLflow, and the API application in containers.
 
 ```bash
-# Start Qdrant + API containers
-docker-compose up --build
+# Start all three services: Qdrant + MLflow + API
+docker compose up --build
 
 # In a separate terminal: train MLP and index documents into the containerised Qdrant
 QDRANT_URL=http://localhost:6333 poetry run python setup.py
 ```
 
+Once running, three services are available:
+- **API** — `http://localhost:8000`
+- **Qdrant Dashboard** — `http://localhost:6333/dashboard`
+- **MLflow UI** — `http://localhost:5000`
+
+To stop all services:
+```bash
+docker compose stop
+```
+
 ### 4. Manual Execution
 
-#### A. Start Qdrant
+#### A. Start Qdrant + MLflow
 
 ```bash
+# Using Docker Compose (recommended)
+docker compose up -d qdrant mlflow
+
+# Or manually:
 docker run -d -p 6333:6333 --name qdrant_rag qdrant/qdrant
+docker run -d -p 5000:5000 --name mlflow_server \
+  -v mlflow_data:/mlflow \
+  ghcr.io/mlflow/mlflow:latest \
+  mlflow server --host 0.0.0.0 --port 5000 \
+  --backend-store-uri sqlite:////mlflow/mlflow.db \
+  --default-artifact-root /mlflow/artifacts
 ```
+
+The MLflow UI is available at `http://localhost:5000`. All agent traces, evaluation runs, and API query metrics are automatically logged here.
 
 #### B. Index documents and train the MLP router
 
@@ -415,7 +446,9 @@ poetry run python scripts/run_evaluation.py \
   --output reports/my_run.json
 ```
 
-Requires `GOOGLE_API_KEY` in `.env` for the Ragas LLM-based metrics (faithfulness, context_recall). All other metrics are computed locally.
+Uses the same LLM provider as the main pipeline (set via `.env`) — no `GOOGLE_API_KEY` required. All metrics are computed locally except faithfulness and context_recall which use the configured LLM via Ragas.
+
+**MLflow Tracking:** Each evaluation run is automatically tracked in MLflow with parameters (provider, thresholds, n_questions), per-question metrics, aggregate scores, and the results JSON logged as an artifact. View results at `http://localhost:5000`.
 
 **Metrics computed:**
 
@@ -430,10 +463,73 @@ Requires `GOOGLE_API_KEY` in `.env` for the Ragas LLM-based metrics (faithfulnes
 | `semantic_similarity` | `bge-large-en-v1.5` cosine | Cosine similarity between generated and reference answer |
 | `rouge_l` | `rouge-score` | ROUGE-L F1 between generated and reference answer |
 
+## Observability & Tracing (MLflow)
+
+The system uses [MLflow](https://mlflow.org/) for end-to-end observability:
+- **Agent-level tracing** — Every agent execution is traced with `@mlflow.trace`, capturing inputs, outputs, latency, and errors as nested spans.
+- **Evaluation tracking** — Each `run_evaluation()` call creates an MLflow run with parameters, per-question metrics, aggregate scores, and the results JSON as an artifact.
+- **Experiment comparison** — Compare evaluation runs side-by-side in the MLflow UI to track improvements across prompt changes, model switches, or threshold tuning.
+
+### Starting the MLflow Server
+
+```bash
+# Option 1: Direct launch (SQLite backend, development)
+poetry run mlflow server \
+  --host 127.0.0.1 \
+  --port 5000 \
+  --backend-store-uri sqlite:////$(pwd)/mlflow.db
+
+# Option 2: Docker Compose (recommended for team access)
+docker compose up mlflow
+```
+
+The Docker Compose configuration uses `sqlite:////mlflow/mlflow.db` (absolute path) with a named volume `mlflow_data` for persistence.
+
+### Troubleshooting
+
+**MLflow UI shows no traces:** Ensure `mlflow_manager.initialise()` runs before any `@mlflow.trace` decorated methods. The API lifespan handler handles this automatically. If traces still don't appear, check that `MLFLOW_TRACKING_URI` in `.env` matches the running server address.
+
+**Container name conflicts:** If you previously ran containers via `docker run`, remove them before using `docker compose`:
+```bash
+docker rm -f mlflow_server qdrant_rag
+```
+
+### Viewing Traces
+
+Open `http://localhost:5000` in your browser. You will see:
+
+1. **Experiments** — The `knowledge-assistant` experiment contains all runs.
+2. **Runs** — Each evaluation or API request appears as a run with:
+   - **Parameters** (provider, thresholds, n_questions)
+   - **Metrics** (faithfulness, context_recall, latency, etc.)
+   - **Traces** (nested span tree showing the full agent execution path)
+   - **Artifacts** (evaluation_results.json)
+
+### Trace Hierarchy
+
+```
+root span: "rag_graph" (per /query request)
+  ├── cache_check        → cache_hit (bool), query (str)
+  ├── guard_input        → is_safe (bool), injection_score (float)
+  ├── router             → dominant_category (str), confidence (float)
+  ├── retrieval          → chunk_count (int), retrieval_time_ms (float)
+  ├── synthesis          → response (str), token_count (int), provider (str)
+  ├── critic             → verdict (str), score (float), retry_count (int)
+  ├── guard_output       → pii_redacted (int), canary_leak (bool)
+  └── action             → audit_success (bool), webhook_success (bool)
+```
+
+### Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MLFLOW_TRACKING_URI` | `http://localhost:5000` | MLflow server URL |
+| `MLFLOW_EXPERIMENT_NAME` | `knowledge-assistant` | Experiment name for all runs |
+
 ## Testing
 
 ```bash
-# Run all 32 tests
+# Run all 67 tests
 poetry run pytest tests/ -v
 
 # Run only fast unit tests (no external dependencies)
@@ -452,6 +548,8 @@ poetry run pytest tests/ -v \
 | `test_model_registry.py` | Provider detection priority, forced provider override | 4 |
 | `test_api.py` | FastAPI endpoints — schema validation, health, metrics | 4 |
 | `test_integration.py` | Full graph pipeline — domain routing, overrides | 3 |
+| `test_auth.py` | Auth — password hashing, JWT, register/login/me flow, roles | 8 |
+| `test_security.py` | Red-team — injection scoring, PII redaction, canary tokens | 30 |
 
 ## Optional Provider Installation
 
@@ -506,5 +604,5 @@ All settings are read from environment variables (or `.env`). The table below li
 | `SESSION_TTL_MINUTES` | `30` | Inactivity timeout for session history |
 | `AUDIT_LOG_PATH` | `logs/audit.jsonl` | Path for the JSON audit log |
 | `WEBHOOK_URL` | — | Optional webhook URL for automated action |
-| `ENABLE_TRACING` | `false` | Write per-agent traces to `logs/agent_traces.jsonl` |
-| `LANGCHAIN_API_KEY` | — | LangSmith API key for LangChain tracing |
+| `MLFLOW_TRACKING_URI` | `http://localhost:5000` | MLflow tracking server URL |
+| `MLFLOW_EXPERIMENT_NAME` | `knowledge-assistant` | MLflow experiment name for all runs |

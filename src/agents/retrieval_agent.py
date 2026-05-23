@@ -15,6 +15,8 @@ import logging
 import time
 from typing import Any, Dict
 
+import mlflow
+
 from src.config.settings import settings
 from src.retrieval.weighted_retriever import WeightedRetriever
 from src.tools.weather_mcp import get_environmental_data
@@ -28,6 +30,7 @@ class RetrievalAgent:
     def __init__(self, retriever: WeightedRetriever) -> None:
         self.retriever = retriever
 
+    @mlflow.trace(name="retrieval")
     def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Retrieve context chunks for the current query.
