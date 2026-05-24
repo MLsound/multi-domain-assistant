@@ -1,3 +1,5 @@
+![""](docs/assets/logoHeader.png)
+
 # Knowledge Assistant: Core Framework & Validation Deployment
 > FIUBA · Maestría en IA · PNL III (2026) — Grupo 1: Sarmiento · Lloveras · Cuenca
 
@@ -56,7 +58,6 @@ graph TD
 
 | Artifact | Path |
 |---|---|
-| Code (this repo) | branch `dev-jorge` |
 | Technical report (PDF) | `docs/informe_maestria.pdf` |
 | Presentation (PPTX) | `docs/presentation_FIUBA.pptx` |
 | Governance pack (NIST AI RMF) | `docs/governance/` |
@@ -612,3 +613,7 @@ All settings are read from environment variables (or `.env`). The table below li
 | `WEBHOOK_URL` | — | Optional webhook URL for automated action |
 | `MLFLOW_TRACKING_URI` | `http://localhost:5000` | MLflow tracking server URL |
 | `MLFLOW_EXPERIMENT_NAME` | `knowledge-assistant` | MLflow experiment name for all runs |
+
+<br>
+
+![""](docs/assets/logoFooter.png)
