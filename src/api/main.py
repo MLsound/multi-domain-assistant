@@ -79,7 +79,9 @@ app = FastAPI(
     version="0.3.0",
     description=(
         "Multi-agent Agentic RAG for sustainable energy and smart building "
-        "knowledge. Hardened against OWASP Top-10 LLM threats; user-aware."
+        "knowledge. Hardened against OWASP Top-10 LLM threats; user-aware. "
+        "See `docs/CONTEXT.md` for details on the specific application context "
+        "used in this deployment."
     ),
     lifespan=lifespan,
 )

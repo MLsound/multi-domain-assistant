@@ -7,6 +7,8 @@ Usage:
     poetry run python scripts/run_evaluation.py --questions data/eval/test_suite.json
     poetry run python scripts/run_evaluation.py --output reports/my_run.json
 
+See `docs/CONTEXT.md` for details on the evaluation domains (Science, Software, User).
+
 Requires GOOGLE_API_KEY in environment (or .env file).
 """
 

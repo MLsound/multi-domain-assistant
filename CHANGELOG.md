@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added `docs/CONTEXT.md` explaining the specific application domain (Sustainable Energy) used to validate the framework.
+- Cross-referenced `CONTEXT.md` across README, API docs, system prompts, and test scripts.
 - Added API backend and schema support in `src/api/`
 - Added authentication, authorization, and security tooling in `src/auth/` and `src/security/`
 - Added model registry and runtime configuration management in `src/config/`

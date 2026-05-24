@@ -1,10 +1,16 @@
-# Knowledge Assistant
-
+# Knowledge Assistant: Core Framework & Validation Deployment
 > FIUBA · Maestría en IA · PNL III (2026) — Grupo 1: Sarmiento · Lloveras · Cuenca
 
-A multi-agent Agentic RAG system for the sustainable energy and smart building knowledge domain. The system routes natural-language queries through an eight-agent LangGraph pipeline — semantic cache, input guard, MLP classifier, retriever-ranker, synthesiser, faithfulness critic, output guard, and automated action — and exposes a FastAPI REST interface with **JWT-based registration / login**, **per-user isolation**, and **MLflow observability**.
+**Knowledge Assistant** is an inherently domain-agnostic, multi-category Agentic RAG framework designed to handle diverse document-consultation tasks within a single unified system. By leveraging a custom MLP-based semantic router and weighted hybrid retrieval, the core architecture seamlessly navigates and synthesizes information across completely disparate knowledge bases, from software documentation to scientific research.
 
-> ⚠️ **Course constraint honoured:** every flow-critical component (auth, guardrails, alignment) is hand-rolled — no auth-as-a-service framework, no plug-and-play guardrails suite. See `docs/informe_maestria.md` for the rationale.
+To validate the capabilities of this framework, this specific deployment is configured for the sustainable energy and smart building domain. While the system remains completely agnostic to the underlying data, this test instance focuses on the intersection of **Sustainable Energy**, **Photovoltaic (PV) Physics**, and **Home Energy Management Systems (HEMS)**. The full scope and technical parameters of this validation environment are documented [here](docs/CONTEXT.md).
+
+**System Architecture & Production Features**
+
+* **Eight-Agent LangGraph Pipeline:** Natural-language queries are dynamically routed through a structured pipeline containing a semantic cache, input guard, MLP classifier, retriever-ranker, synthesizer, faithfulness critic, output guard, and an automated action agent.
+* **Production-Grade Production Interface:** The system exposes a FastAPI REST interface built with **JWT-based registration / login**, strict **per-user isolation** for data security, and **MLflow observability** for continuous evaluation and pipeline tracking.
+
+> ⚠️ **Course constraint honoured:** every flow-critical component (auth, guardrails, alignment) is hand-rolled — no auth-as-a-service framework, no plug-and-play guardrails suite. See full [report](docs/informe_maestria.md) for the rationale (in spanish).
 
 ## Architecture
 
@@ -175,6 +181,7 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 │   ├── software/                # 15 HEMS, EV charger, thermostat API files
 │   └── user/                    # 7 safety manuals and scheduling guides
 ├── tests/
+│   ├── smoke_test.py            # Legacy two-query smoke test
 │   ├── test_action.py           # ActionAgent (3 tests)
 │   ├── test_api.py              # FastAPI endpoints (4 tests)
 │   ├── test_auth.py             # Auth — password, JWT, register/login/me (8 tests)
@@ -193,7 +200,6 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 ├── models/                      # Trained MLP weights (gitignored)
 ├── chat.py                      # Interactive CLI interface
 ├── setup.py                     # Bootstrap: MLP training + Qdrant indexing
-├── smoke_test.py                # Legacy two-query smoke test
 ├── run.sh                       # All-in-one setup and launch script
 ├── Dockerfile                   # Multi-stage CPU-only build (~1.5 GB)
 ├── docker-compose.yml           # Qdrant + MLflow + API services (dev: Qdrant + MLflow only)
