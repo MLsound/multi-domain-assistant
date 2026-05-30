@@ -70,3 +70,4 @@ mlflow.db
 
 # Other folders
 varios/
+/mlartifacts
