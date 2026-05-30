@@ -79,9 +79,9 @@ class SynthesisAgent:
 
         # Build context string with source tags
         context_parts = [
-            f"[{c.get('category', '?')}]"
-            f"[source:{c.get('metadata', {}).get('source_id', 'unknown')}] "
-            f"{c.get('content', '')}"
+            f"[{c.category}]"
+            f"[source:{c.metadata.get('source_id', 'unknown')}] "
+            f"{c.content}"
             for c in chunks
         ]
         context_str = "\n\n".join(context_parts)
@@ -105,7 +105,7 @@ class SynthesisAgent:
         if history:
             recent = history[-3:]
             history_str = "\n\nConversation history:\n" + "\n".join(
-                f"User: {h.get('query', '')}\nAssistant: {h.get('response', '')}"
+                f"User: {h.query}\nAssistant: {h.response}"
                 for h in recent
             )
 

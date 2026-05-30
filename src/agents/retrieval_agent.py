@@ -46,8 +46,8 @@ class RetrievalAgent:
         # On retry, append critic's refinement hint to the query
         retry_count: int = state.get("retry_count", 0)
         if retry_count > 0:
-            verdict = state.get("critic_verdict") or {}
-            refinement = verdict.get("suggested_refinement")
+            verdict = state.get("critic_verdict")
+            refinement = verdict.suggested_refinement if verdict else None
             if refinement:
                 query = f"{query} {refinement}"
                 logger.info(
@@ -79,7 +79,7 @@ class RetrievalAgent:
                 logger.warning("MCP tool failed — proceeding without env data")
 
         sources = list({
-            c.get("metadata", {}).get("source_id", "unknown")
+            c.metadata.get("source_id", "unknown")
             for c in chunks
         })
 

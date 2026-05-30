@@ -13,7 +13,45 @@ from __future__ import annotations
 import operator
 from typing import Annotated, Any, Dict, List, Optional
 
+from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
+
+
+class ConversationTurn(BaseModel):
+    query: str
+    response: str
+
+
+class GuardResult(BaseModel):
+    is_safe: bool
+    rejection_reason: Optional[str] = None
+    validated_response: Optional[str] = None
+    injection_score: Optional[float] = None
+    injection_decision: Optional[str] = None
+    pii_detections: List[Dict[str, Any]] = Field(default_factory=list)
+    pii_redacted_on_output: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class RetrievalChunk(BaseModel):
+    content: str
+    metadata: Dict[str, Any]
+    score: float
+    original_score: float
+    category: str
+    rerank_score: Optional[float] = None
+
+
+class CriticVerdict(BaseModel):
+    approved: bool
+    score: float
+    issues: List[str] = Field(default_factory=list)
+    suggested_refinement: Optional[str] = None
+
+
+class ActionResult(BaseModel):
+    action_type: str
+    success: bool
+    details: str
 
 
 class GraphState(TypedDict):
@@ -23,20 +61,18 @@ class GraphState(TypedDict):
     query: str
     is_help_section: bool
     session_id: Optional[str]
-    history: Annotated[List[Dict[str, str]], operator.add]
+    history: Annotated[List[ConversationTurn], operator.add]
 
     # ------------------------------------------------------------------
     # Guard (input phase) output
     # ------------------------------------------------------------------
     sanitized_query: str
-    # {is_safe: bool, rejection_reason: str | None}
-    guard_input_result: Dict[str, Any]
+    guard_input_result: GuardResult
 
     # ------------------------------------------------------------------
     # Guard (output phase) output
     # ------------------------------------------------------------------
-    # {is_safe: bool, validated_response: str}
-    guard_output_result: Dict[str, Any]
+    guard_output_result: GuardResult
 
     # ------------------------------------------------------------------
     # Router Agent output
@@ -48,7 +84,7 @@ class GraphState(TypedDict):
     # ------------------------------------------------------------------
     # Retrieval Agent output
     # ------------------------------------------------------------------
-    retrieved_chunks: List[Dict[str, Any]]
+    retrieved_chunks: List[RetrievalChunk]
     context_metadata: Dict[str, Any]
     retrieval_time_ms: float
     sources_cited: List[str]
@@ -62,8 +98,7 @@ class GraphState(TypedDict):
     # ------------------------------------------------------------------
     # Critic Agent output
     # ------------------------------------------------------------------
-    # {approved: bool, score: float, issues: list, suggested_refinement: str|None}
-    critic_verdict: Dict[str, Any]
+    critic_verdict: CriticVerdict
     retry_count: int
 
     # ------------------------------------------------------------------
@@ -74,5 +109,4 @@ class GraphState(TypedDict):
     # ------------------------------------------------------------------
     # Action Agent output
     # ------------------------------------------------------------------
-    # {action_type: str, success: bool, details: str}
-    action_result: Dict[str, Any]
+    action_result: ActionResult

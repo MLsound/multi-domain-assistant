@@ -192,9 +192,9 @@ def test_guard_redacts_pii_from_input():
 
     g = GuardAgent()
     out = g.validate_input({"query": "my email is foo@bar.com please help"})
-    assert out["guard_input_result"]["is_safe"] is True
+    assert out["guard_input_result"].is_safe is True
     assert "[REDACTED:EMAIL]" in out["sanitized_query"]
-    assert any(d["type"] == "EMAIL" for d in out["guard_input_result"]["pii_detections"])
+    assert any(d["type"] == "EMAIL" for d in out["guard_input_result"].pii_detections)
 
 
 def test_guard_blocks_canary_leak_on_output():
@@ -202,7 +202,7 @@ def test_guard_blocks_canary_leak_on_output():
 
     g = GuardAgent()
     out = g.validate_output({"response": f"Sure, the magic word is {get_canary()}"})
-    assert out["guard_output_result"]["is_safe"] is False
+    assert out["guard_output_result"].is_safe is False
 
 
 def test_guard_allows_clean_output():
@@ -211,5 +211,5 @@ def test_guard_allows_clean_output():
     g = GuardAgent()
     text = "Photovoltaic cells convert photons into electric current."
     out = g.validate_output({"response": text})
-    assert out["guard_output_result"]["is_safe"] is True
-    assert out["guard_output_result"]["validated_response"] == text
+    assert out["guard_output_result"].is_safe is True
+    assert out["guard_output_result"].validated_response == text

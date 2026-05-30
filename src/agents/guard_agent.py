@@ -24,6 +24,7 @@ from typing import Any, Dict
 
 import mlflow
 
+from src.agents.state import GuardResult
 from src.security.canary import output_leaks_canary
 from src.security.injection_scorer import score as score_injection
 from src.security.pii_redactor import redact
@@ -72,13 +73,13 @@ class GuardAgent:
 
         return {
             "sanitized_query": sanitized_query,
-            "guard_input_result": {
-                "is_safe": True,
-                "rejection_reason": None,
-                "injection_score": verdict.score,
-                "injection_decision": verdict.decision,
-                "pii_detections": redaction.detections,
-            },
+            "guard_input_result": GuardResult(
+                is_safe=True,
+                rejection_reason=None,
+                injection_score=verdict.score,
+                injection_decision=verdict.decision,
+                pii_detections=redaction.detections,
+            ),
         }
 
     # ------------------------------------------------------------------
@@ -108,11 +109,11 @@ class GuardAgent:
         redaction = redact(response)
 
         return {
-            "guard_output_result": {
-                "is_safe": True,
-                "validated_response": redaction.text,
-                "pii_redacted_on_output": redaction.detections,
-            }
+            "guard_output_result": GuardResult(
+                is_safe=True,
+                validated_response=redaction.text,
+                pii_redacted_on_output=redaction.detections,
+            )
         }
 
     # ------------------------------------------------------------------
@@ -121,17 +122,17 @@ class GuardAgent:
     @staticmethod
     def _reject_input(reason: str) -> Dict[str, Any]:
         return {
-            "guard_input_result": {
-                "is_safe": False,
-                "rejection_reason": reason,
-            }
+            "guard_input_result": GuardResult(
+                is_safe=False,
+                rejection_reason=reason,
+            )
         }
 
     @staticmethod
     def _reject_output(safe_message: str) -> Dict[str, Any]:
         return {
-            "guard_output_result": {
-                "is_safe": False,
-                "validated_response": safe_message,
-            }
+            "guard_output_result": GuardResult(
+                is_safe=False,
+                validated_response=safe_message,
+            )
         }

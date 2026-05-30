@@ -9,6 +9,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from src.agents.critic_agent import CriticAgent
+from src.agents.state import RetrievalChunk
 
 
 def _make_registry(json_response: str) -> MagicMock:
@@ -27,10 +28,13 @@ def _base_state() -> dict:
         "sanitized_query": "What is the Weibull distribution?",
         "response": "The two-parameter Weibull distribution models PV module lifespan.",
         "retrieved_chunks": [
-            {
-                "content": "PV lifespan is modelled by the two-parameter Weibull distribution.",
-                "metadata": {"source_id": "pv_reliability_math.txt"},
-            }
+            RetrievalChunk(
+                content="PV lifespan is modelled by the two-parameter Weibull distribution.",
+                metadata={"source_id": "pv_reliability_math.txt"},
+                score=0.9,
+                original_score=0.9,
+                category="Science",
+            )
         ],
         "retry_count": 0,
     }
@@ -40,8 +44,8 @@ def test_critic_approves_faithful_response() -> None:
     json_out = '{"approved": true, "score": 0.95, "issues": [], "suggested_refinement": null}'
     agent = CriticAgent(_make_registry(json_out))
     result = agent.run(_base_state())
-    assert result["critic_verdict"]["approved"] is True
-    assert result["critic_verdict"]["score"] >= 0.9
+    assert result["critic_verdict"].approved is True
+    assert result["critic_verdict"].score >= 0.9
 
 
 def test_critic_rejects_unfaithful_response() -> None:
@@ -52,9 +56,9 @@ def test_critic_rejects_unfaithful_response() -> None:
     )
     agent = CriticAgent(_make_registry(json_out))
     result = agent.run(_base_state())
-    assert result["critic_verdict"]["approved"] is False
-    assert len(result["critic_verdict"]["issues"]) > 0
-    assert result["critic_verdict"]["suggested_refinement"] is not None
+    assert result["critic_verdict"].approved is False
+    assert len(result["critic_verdict"].issues) > 0
+    assert result["critic_verdict"].suggested_refinement is not None
 
 
 def test_critic_defaults_to_approve_on_llm_failure() -> None:
@@ -67,5 +71,5 @@ def test_critic_defaults_to_approve_on_llm_failure() -> None:
     result = agent.run(_base_state())
 
     # Must default to approved (fail-open) and not raise
-    assert result["critic_verdict"]["approved"] is True
-    assert result["critic_verdict"]["score"] == 1.0
+    assert result["critic_verdict"].approved is True
+    assert result["critic_verdict"].score == 1.0
