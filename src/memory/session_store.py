@@ -12,6 +12,7 @@ import logging
 import time
 from typing import Dict, List
 
+from src.agents.state import ConversationTurn
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ class SessionStore:
         # {session_id: {"history": [...], "last_access": float}}
         self._store: Dict[str, Dict] = {}
 
-    def get_history(self, session_id: str) -> List[Dict[str, str]]:
+    def get_history(self, session_id: str) -> List[ConversationTurn]:
         """Return conversation history for session_id, or [] if expired/absent."""
         entry = self._store.get(session_id)
         if entry is None:
@@ -49,7 +50,7 @@ class SessionStore:
             self._store[session_id] = {"history": [], "last_access": time.time()}
 
         self._store[session_id]["history"].append(
-            {"query": query, "response": response}
+            ConversationTurn(query=query, response=response)
         )
         self._store[session_id]["last_access"] = time.time()
 

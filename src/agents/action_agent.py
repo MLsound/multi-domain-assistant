@@ -18,6 +18,7 @@ from typing import Any, Dict
 
 import mlflow
 
+from src.agents.state import ActionResult
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ class ActionAgent:
                 from_cache, response
         Writes: action_result
         """
+        critic_verdict = state.get("critic_verdict")
         record = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "session_id": state.get("session_id", "unknown"),
@@ -47,11 +49,7 @@ class ActionAgent:
             "retrieval_time_ms": state.get("retrieval_time_ms", 0.0),
             "token_count": state.get("token_count", 0),
             "sources_cited": state.get("sources_cited", []),
-            "critic_score": (
-                state.get("critic_verdict", {}).get("score")
-                if state.get("critic_verdict")
-                else None
-            ),
+            "critic_score": critic_verdict.score if critic_verdict else None,
             "retry_count": state.get("retry_count", 0),
             "from_cache": state.get("from_cache", False),
             # Store only a preview to keep log files manageable
@@ -94,9 +92,9 @@ class ActionAgent:
                 )
 
         return {
-            "action_result": {
-                "action_type": action_type,
-                "success": success,
-                "details": details,
-            }
+            "action_result": ActionResult(
+                action_type=action_type,
+                success=success,
+                details=details,
+            )
         }

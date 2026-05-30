@@ -26,6 +26,7 @@ from qdrant_client import QdrantClient, models
 from sentence_transformers import CrossEncoder, SentenceTransformer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from src.agents.state import RetrievalChunk
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -82,7 +83,7 @@ class WeightedRetriever:
         query: str,
         category_probs: Dict[str, float],
         top_k: int | None = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[RetrievalChunk]:
         """
         Retrieve and rerank context chunks.
 
@@ -102,7 +103,7 @@ class WeightedRetriever:
             top_k = settings.retrieval_top_k
 
         query_vector = self.embedding_model.encode(query).tolist()
-        candidates: List[Dict[str, Any]] = []
+        candidates: List[RetrievalChunk] = []
 
         for category, prob in category_probs.items():
             if prob <= 0:
@@ -116,13 +117,13 @@ class WeightedRetriever:
 
             for res in results:
                 weighted_score = prob * res.score
-                candidates.append({
-                    "content": res.payload.get("text", ""),
-                    "metadata": res.payload,
-                    "score": weighted_score,
-                    "original_score": res.score,
-                    "category": category,
-                })
+                candidates.append(RetrievalChunk(
+                    content=res.payload.get("text", ""),
+                    metadata=res.payload,
+                    score=weighted_score,
+                    original_score=res.score,
+                    category=category,
+                ))
 
         if not candidates:
             logger.warning("No candidates retrieved from Qdrant")
@@ -131,12 +132,12 @@ class WeightedRetriever:
         # --- Stage 2: Cross-encoder reranking ---
         final_k = settings.retrieval_final_k
         if len(candidates) > final_k:
-            pairs = [(query, c["content"]) for c in candidates]
+            pairs = [(query, c.content) for c in candidates]
             try:
                 rerank_scores = self.reranker.predict(pairs)
                 for i, score in enumerate(rerank_scores):
-                    candidates[i]["rerank_score"] = float(score)
-                candidates.sort(key=lambda x: x.get("rerank_score", 0.0), reverse=True)
+                    candidates[i].rerank_score = float(score)
+                candidates.sort(key=lambda x: x.rerank_score or 0.0, reverse=True)
                 logger.debug(
                     "Reranked %d candidates → top %d",
                     len(candidates),
@@ -146,9 +147,9 @@ class WeightedRetriever:
                 logger.exception(
                     "Cross-encoder reranking failed — falling back to weighted scores"
                 )
-                candidates.sort(key=lambda x: x["score"], reverse=True)
+                candidates.sort(key=lambda x: x.score, reverse=True)
         else:
-            candidates.sort(key=lambda x: x["score"], reverse=True)
+            candidates.sort(key=lambda x: x.score, reverse=True)
 
         return candidates[:final_k]
 

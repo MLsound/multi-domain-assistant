@@ -161,8 +161,6 @@ async def query(
                 "retry_count": 0,
                 "from_cache": False,
                 "sanitized_query": "",
-                "guard_input_result": {},
-                "guard_output_result": {},
                 "category_probs": {},
                 "dominant_category": "",
                 "confidence": 0.0,
@@ -172,8 +170,6 @@ async def query(
                 "sources_cited": [],
                 "response": "",
                 "token_count": 0,
-                "critic_verdict": {},
-                "action_result": {},
             }
 
             result = await asyncio.wait_for(
@@ -187,13 +183,13 @@ async def query(
             if result.get("from_cache"):
                 _metrics["cache_hits"] += 1
 
-            guard_in = result.get("guard_input_result") or {}
-            guard_out = result.get("guard_output_result") or {}
-            blocked = not guard_in.get("is_safe", True)
+            guard_in = result.get("guard_input_result")
+            guard_out = result.get("guard_output_result")
+            blocked = not guard_in.is_safe if guard_in else False
             if blocked:
                 _metrics["blocked_by_guard"] += 1
-            pii_in = guard_in.get("pii_detections") or []
-            pii_out = guard_out.get("pii_redacted_on_output") or []
+            pii_in = guard_in.pii_detections if guard_in else []
+            pii_out = guard_out.pii_redacted_on_output if guard_out else []
             if pii_in or pii_out:
                 _metrics["pii_redacted"] += 1
 
@@ -233,8 +229,8 @@ async def query(
                 token_count=result.get("token_count", 0),
                 retry_count=result.get("retry_count", 0),
                 from_cache=result.get("from_cache", False),
-                injection_score=guard_in.get("injection_score", 0.0),
-                injection_decision=guard_in.get("injection_decision", "allow"),
+                injection_score=guard_in.injection_score if guard_in else 0.0,
+                injection_decision=guard_in.injection_decision if guard_in else "allow",
                 pii_redacted_count=len(pii_in) + len(pii_out),
             )
 

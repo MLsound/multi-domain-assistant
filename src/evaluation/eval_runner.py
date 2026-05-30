@@ -55,12 +55,12 @@ def _load_test_suite(path: str) -> List[Dict[str, Any]]:
         return json.load(f)
 
 
-def _precision_at_k(chunks: List[Dict], expected_domain: str, k: int = 5) -> float:
+def _precision_at_k(chunks: List[Any], expected_domain: str, k: int = 5) -> float:
     """Fraction of top-k chunks whose category matches the expected domain."""
     top_k = chunks[:k]
     if not top_k:
         return 0.0
-    matches = sum(1 for c in top_k if c.get("category") == expected_domain)
+    matches = sum(1 for c in top_k if c.category == expected_domain)
     return matches / len(top_k)
 
 
@@ -96,6 +96,13 @@ def run_evaluation(
     rag_system = RAGGraph()
 
     # --- Load test suite ---
+    def _load_test_suite(path: str) -> List[Dict[str, Any]]:
+        suite_path = Path(path)
+        if not suite_path.exists():
+            raise FileNotFoundError(f"Test suite not found: {suite_path}")
+        with open(suite_path, encoding="utf-8") as f:
+            return json.load(f)
+
     test_cases = _load_test_suite(test_suite_path)
     logger.info("Loaded %d test cases from %s", len(test_cases), test_suite_path)
 
@@ -132,8 +139,6 @@ def run_evaluation(
                 "retry_count": 0,
                 "from_cache": False,
                 "sanitized_query": "",
-                "guard_input_result": {},
-                "guard_output_result": {},
                 "category_probs": {},
                 "dominant_category": "",
                 "confidence": 0.0,
@@ -143,8 +148,6 @@ def run_evaluation(
                 "sources_cited": [],
                 "response": "",
                 "token_count": 0,
-                "critic_verdict": {},
-                "action_result": {},
             }
 
             t0 = time.perf_counter()
@@ -153,7 +156,7 @@ def run_evaluation(
 
             answer = result.get("response", "")
             chunks = result.get("retrieved_chunks", [])
-            context_texts = [c.get("content", "") for c in chunks]
+            context_texts = [c.content for c in chunks]
 
             sim_score = semantic_similarity(answer, ground_truth, sim_model) if ground_truth else None
             rouge = compute_rouge_l(answer, ground_truth) if ground_truth else None
@@ -177,8 +180,6 @@ def run_evaluation(
             })
 
             # Build ragas 0.2 SingleTurnSample
-            # Field names changed: question->user_input, answer->response,
-            # contexts->retrieved_contexts, ground_truth->reference
             ragas_samples.append(SingleTurnSample(
                 user_input=question,
                 response=answer,

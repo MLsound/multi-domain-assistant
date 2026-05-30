@@ -23,6 +23,7 @@ import mlflow
 from langchain_core.messages import HumanMessage, SystemMessage
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from src.agents.state import CriticVerdict
 from src.config.model_registry import ModelRegistry
 from src.config.settings import settings
 
@@ -43,12 +44,12 @@ _CRITIC_SYSTEM_PROMPT = (
     "Return ONLY the JSON object. No preamble, no explanation, no markdown fences."
 )
 
-_DEFAULT_VERDICT: Dict[str, Any] = {
-    "approved": True,
-    "score": 1.0,
-    "issues": [],
-    "suggested_refinement": None,
-}
+_DEFAULT_VERDICT = CriticVerdict(
+    approved=True,
+    score=1.0,
+    issues=[],
+    suggested_refinement=None,
+)
 
 
 def _parse_verdict(raw: str) -> Dict[str, Any]:
