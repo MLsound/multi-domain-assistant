@@ -12,6 +12,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from src.agents.state import RetrievalChunk
+
 
 def _mock_llm_response(text: str) -> MagicMock:
     """Build a mock LLM response object."""
@@ -21,15 +23,15 @@ def _mock_llm_response(text: str) -> MagicMock:
     return resp
 
 
-def _mock_chunks(category: str = "Science", source: str = "test.txt") -> list:
+def _mock_chunks(category: str = "Science", source: str = "test.txt") -> list[RetrievalChunk]:
     return [
-        {
-            "content": "Crystalline silicon PV efficiency degrades above 25°C.",
-            "category": category,
-            "metadata": {"source_id": source, "category": category},
-            "score": 0.9,
-            "original_score": 0.9,
-        }
+        RetrievalChunk(
+            content="Crystalline silicon PV efficiency degrades above 25°C.",
+            category=category,
+            metadata={"source_id": source, "category": category},
+            score=0.9,
+            original_score=0.9,
+        )
     ]
 
 

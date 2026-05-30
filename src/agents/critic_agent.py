@@ -95,7 +95,7 @@ class CriticAgent:
             return {"critic_verdict": _DEFAULT_VERDICT}
 
         context_str = "\n\n".join(
-            f"[source:{c.get('metadata', {}).get('source_id', '?')}] {c.get('content', '')}"
+            f"[source:{c.metadata.get('source_id', '?')}] {c.content}"
             for c in chunks
         )
 
@@ -121,14 +121,14 @@ class CriticAgent:
 
         try:
             resp = _invoke()
-            verdict = _parse_verdict(resp.content)
-            score = float(verdict.get("score", 1.0))
+            verdict_dict = _parse_verdict(resp.content)
+            verdict = CriticVerdict(**verdict_dict)
 
             logger.info(
                 "Critic verdict: approved=%s score=%.2f issues=%s",
-                verdict.get("approved"),
-                score,
-                verdict.get("issues", []),
+                verdict.approved,
+                verdict.score,
+                verdict.issues,
             )
             return {"critic_verdict": verdict}
 

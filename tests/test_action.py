@@ -11,6 +11,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from src.agents.action_agent import ActionAgent
+from src.agents.state import CriticVerdict
 
 
 def _base_state() -> dict:
@@ -23,7 +24,7 @@ def _base_state() -> dict:
         "retrieval_time_ms": 120.5,
         "token_count": 350,
         "sources_cited": ["mppt_efficiency_physics.txt"],
-        "critic_verdict": {"score": 0.9, "approved": True},
+        "critic_verdict": CriticVerdict(score=0.9, approved=True, issues=[], suggested_refinement=None),
         "retry_count": 0,
         "from_cache": False,
         "response": "MPPT stands for Maximum Power Point Tracking.",
@@ -41,7 +42,7 @@ def test_action_writes_audit_log(tmp_path: Path) -> None:
         agent = ActionAgent()
         result = agent.execute(_base_state())
 
-    assert result["action_result"]["success"] is True
+    assert result["action_result"].success is True
     assert log_file.exists()
     with open(log_file, encoding="utf-8") as f:
         record = json.loads(f.readline())
@@ -60,8 +61,8 @@ def test_action_succeeds_without_webhook(tmp_path: Path) -> None:
         agent = ActionAgent()
         result = agent.execute(_base_state())
 
-    assert result["action_result"]["success"] is True
-    assert result["action_result"]["action_type"] == "json_log"
+    assert result["action_result"].success is True
+    assert log_file.exists()
 
 
 def test_action_handles_webhook_failure_gracefully(tmp_path: Path) -> None:
@@ -77,5 +78,5 @@ def test_action_handles_webhook_failure_gracefully(tmp_path: Path) -> None:
         result = agent.execute(_base_state())
 
     # Log write still succeeded
-    assert result["action_result"]["success"] is True
+    assert result["action_result"].success is True
     assert log_file.exists()

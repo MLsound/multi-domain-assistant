@@ -28,8 +28,8 @@ class GuardResult(BaseModel):
     validated_response: Optional[str] = None
     injection_score: Optional[float] = None
     injection_decision: Optional[str] = None
-    pii_detections: List[str] = Field(default_factory=list)
-    pii_redacted_on_output: List[str] = Field(default_factory=list)
+    pii_detections: List[Dict[str, Any]] = Field(default_factory=list)
+    pii_redacted_on_output: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class RetrievalChunk(BaseModel):

@@ -9,6 +9,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from src.agents.synthesis_agent import SynthesisAgent
+from src.agents.state import RetrievalChunk
 
 
 def _make_registry(response_text: str) -> MagicMock:
@@ -25,13 +26,14 @@ def _make_registry(response_text: str) -> MagicMock:
     return mock_registry
 
 
-def _make_chunk(content: str, source_id: str = "test_doc.txt", category: str = "Science") -> dict:
-    return {
-        "content": content,
-        "category": category,
-        "metadata": {"source_id": source_id},
-        "score": 0.9,
-    }
+def _make_chunk(content: str, source_id: str = "test_doc.txt", category: str = "Science") -> RetrievalChunk:
+    return RetrievalChunk(
+        content=content,
+        category=category,
+        metadata={"source_id": source_id},
+        score=0.9,
+        original_score=0.9,
+    )
 
 
 def test_synthesis_with_chunks_returns_response() -> None:
