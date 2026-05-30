@@ -10,6 +10,7 @@ configured threshold (settings.science_threshold).
 from __future__ import annotations
 
 import logging
+import random
 
 from langchain_core.tools import tool
 
@@ -25,9 +26,12 @@ def get_environmental_data() -> dict:
     """
     logger.debug("Fetching environmental metadata via MCP mock tool")
     return {
-        "temperature_celsius": 22.0,
-        "humidity_percent": 45.0,
-        "precipitation_mm": 0.0,
-        "soil_temperature_celsius": 18.5,
-        "soil_moisture_percent": 32.0,
+        "temperature_celsius": round(random.uniform(15.0, 35.0), 1),
+        "humidity_percent": round(random.uniform(30.0, 80.0), 1),
+        "precipitation_mm": round(random.uniform(0.0, 5.0), 1) if random.random() > 0.8 else 0.0,
+        "wind_speed_ms": round(random.uniform(0.0, 15.0), 1),
+        "wind_direction_degrees": random.randint(0, 359),
+        "air_pressure_hpa": round(random.uniform(980.0, 1030.0), 1),
+        "soil_temperature_celsius": round(random.uniform(10.0, 25.0), 1),
+        "soil_moisture_percent": round(random.uniform(10.0, 50.0), 1),
     }
