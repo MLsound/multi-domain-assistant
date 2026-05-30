@@ -1,0 +1,11 @@
+# Syntax: Proper Name <proper@email.com> [Commit Name] <commit@email.com>
+
+# 1. Consolidating 'MLsound' and 'Ale Lloveras'
+MLsound <ml.sound.dev@gmail.com> Ale Lloveras <161211939+MLsound@users.noreply.github.com>
+
+# 2. Consolidating 'BenjaSar', 'FabianS', and 'unknown'
+BenjaSar <fsarmiento1805@gmail.com> unknown <fsarmiento1805@gmail.com>
+BenjaSar <fsarmiento1805@gmail.com> FabianS <49500075+BenjaSar@users.noreply.github.com>
+
+# 3. Formatting 'Jorgecuenca1'
+Jorge Cuenca <jorge.cuenca@unillanos.edu.co> Jorgecuenca1 <jorge.cuenca@unillanos.edu.co>
