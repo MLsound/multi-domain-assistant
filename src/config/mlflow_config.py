@@ -53,8 +53,16 @@ class MLflowManager:
         if not self._initialised:
             self.initialise()
 
-        with mlflow.start_run(run_name=run_name, tags=tags or {}) as run:
-            logger.debug("MLflow run started: %s", run.info.run_id)
+        # If a run is already active, we start a nested run.
+        # This prevents the "Run already active" exception.
+        is_nested = mlflow.active_run() is not None
+        
+        with mlflow.start_run(run_name=run_name, tags=tags or {}, nested=is_nested) as run:
+            logger.debug(
+                "MLflow %srun started: %s", 
+                "nested " if is_nested else "", 
+                run.info.run_id
+            )
             yield run
 
     def log_params(self, params: dict[str, Any]) -> None:
