@@ -120,15 +120,9 @@ class CriticAgent:
             return await llm.ainvoke(messages)
 
         try:
-<<<<<<< ours
-            resp = _invoke()
+            resp = await _invoke()
             verdict_dict = _parse_verdict(resp.content)
             verdict = CriticVerdict(**verdict_dict)
-=======
-            resp = await _invoke()
-            verdict = _parse_verdict(resp.content)
-            score = float(verdict.get("score", 1.0))
->>>>>>> theirs
 
             logger.info(
                 "Critic verdict: approved=%s score=%.2f issues=%s",

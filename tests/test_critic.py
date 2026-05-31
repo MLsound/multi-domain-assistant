@@ -47,15 +47,9 @@ def _base_state() -> dict:
 async def test_critic_approves_faithful_response() -> None:
     json_out = '{"approved": true, "score": 0.95, "issues": [], "suggested_refinement": null}'
     agent = CriticAgent(_make_registry(json_out))
-<<<<<<< ours
-    result = agent.run(_base_state())
+    result = await agent.run(_base_state())
     assert result["critic_verdict"].approved is True
     assert result["critic_verdict"].score >= 0.9
-=======
-    result = await agent.run(_base_state())
-    assert result["critic_verdict"]["approved"] is True
-    assert result["critic_verdict"]["score"] >= 0.9
->>>>>>> theirs
 
 
 @pytest.mark.asyncio
@@ -66,17 +60,10 @@ async def test_critic_rejects_unfaithful_response() -> None:
         '"suggested_refinement": "Include Weibull shape and scale parameters"}'
     )
     agent = CriticAgent(_make_registry(json_out))
-<<<<<<< ours
-    result = agent.run(_base_state())
+    result = await agent.run(_base_state())
     assert result["critic_verdict"].approved is False
     assert len(result["critic_verdict"].issues) > 0
     assert result["critic_verdict"].suggested_refinement is not None
-=======
-    result = await agent.run(_base_state())
-    assert result["critic_verdict"]["approved"] is False
-    assert len(result["critic_verdict"]["issues"]) > 0
-    assert result["critic_verdict"]["suggested_refinement"] is not None
->>>>>>> theirs
 
 
 @pytest.mark.asyncio
