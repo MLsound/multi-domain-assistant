@@ -29,6 +29,7 @@ Output: reports/evaluation_results.json
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -64,7 +65,7 @@ def _precision_at_k(chunks: List[Any], expected_domain: str, k: int = 5) -> floa
     return matches / len(top_k)
 
 
-def run_evaluation(
+async def run_evaluation(
     test_suite_path: str = "data/eval/test_suite.json",
     output_path: str = "reports/evaluation_results.json",
 ) -> Dict[str, Any]:
@@ -151,7 +152,7 @@ def run_evaluation(
             }
 
             t0 = time.perf_counter()
-            result = rag_system.app.invoke(inputs)
+            result = await rag_system.app.ainvoke(inputs)
             total_latency_ms = (time.perf_counter() - t0) * 1000
 
             answer = result.get("response", "")
@@ -189,7 +190,7 @@ def run_evaluation(
 
             if i < len(test_cases) - 1:
                 logger.debug("Sleeping 3s between queries...")
-                time.sleep(3)
+                await asyncio.sleep(3)
 
         # --- Ragas 0.2 evaluation ---
         eval_dataset = EvaluationDataset(samples=ragas_samples)

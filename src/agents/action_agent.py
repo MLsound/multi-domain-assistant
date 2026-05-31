@@ -28,7 +28,7 @@ class ActionAgent:
     """Executes automated post-response output actions."""
 
     @mlflow.trace(name="action")
-    def execute(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Write audit log and optionally fire a webhook.
 
@@ -78,12 +78,13 @@ class ActionAgent:
             try:
                 import httpx
 
-                r = httpx.post(
-                    settings.webhook_url,
-                    json=record,
-                    timeout=10.0,
-                )
-                r.raise_for_status()
+                async with httpx.AsyncClient() as client:
+                    r = await client.post(
+                        settings.webhook_url,
+                        json=record,
+                        timeout=10.0,
+                    )
+                    r.raise_for_status()
                 action_type = "json_log+webhook"
                 logger.info("Webhook delivered to %s", settings.webhook_url)
             except Exception:

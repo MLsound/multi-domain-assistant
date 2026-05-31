@@ -31,7 +31,7 @@ class RetrievalAgent:
         self.retriever = retriever
 
     @mlflow.trace(name="retrieval")
-    def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Retrieve context chunks for the current query.
 
@@ -72,7 +72,7 @@ class RetrievalAgent:
         context_metadata: Dict[str, Any] = {}
         if probs.get("Science", 0) > settings.science_threshold:
             try:
-                env_data = get_environmental_data.invoke({})
+                env_data = await get_environmental_data.ainvoke({})
                 context_metadata = {"environmental_conditions": env_data}
                 logger.debug("Environmental metadata injected: %s", env_data)
             except Exception:

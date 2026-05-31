@@ -75,7 +75,7 @@ def _critic_decision(
 def _make_cache_check_node(cache: SemanticCache):
     """Return a node function that checks the semantic cache."""
 
-    def cache_check(state: GraphState) -> Dict[str, Any]:
+    async def cache_check(state: GraphState) -> Dict[str, Any]:
         query = state.get("query", "")
         hit = cache.check(query)
         if hit:
@@ -107,11 +107,18 @@ def _make_cache_check_node(cache: SemanticCache):
 
 
 def _make_guard_input_node(guard: GuardAgent):
+<<<<<<< ours
     def node(state: GraphState) -> Dict[str, Any]:
         result = guard.validate_input(state)
         guard_result = result.get("guard_input_result")
         if guard_result and not guard_result.is_safe:
             reason = guard_result.rejection_reason or "Query rejected"
+=======
+    async def node(state: GraphState) -> Dict[str, Any]:
+        result = await guard.validate_input(state)
+        if not result.get("guard_input_result", {}).get("is_safe"):
+            reason = result["guard_input_result"].get("rejection_reason", "Query rejected")
+>>>>>>> theirs
             result["response"] = f"Request blocked: {reason}"
         return result
     return node
@@ -126,10 +133,16 @@ _UNCACHEABLE_RESPONSES = {
 
 
 def _make_guard_output_node(guard: GuardAgent, cache: SemanticCache):
+<<<<<<< ours
     def node(state: GraphState) -> Dict[str, Any]:
         result = guard.validate_output(state)
         guard_result = result.get("guard_output_result")
         validated = guard_result.validated_response if guard_result else ""
+=======
+    async def node(state: GraphState) -> Dict[str, Any]:
+        result = await guard.validate_output(state)
+        validated = result.get("guard_output_result", {}).get("validated_response", "")
+>>>>>>> theirs
 
         # Only cache safe, substantive responses with at least one cited source.
         # Never cache fallback / error messages — doing so poisons the cache and
@@ -157,9 +170,15 @@ def _make_guard_output_node(guard: GuardAgent, cache: SemanticCache):
 def _make_critic_node(critic: CriticAgent):
     """Wrap CriticAgent.run() and increment retry_count on rejection."""
 
+<<<<<<< ours
     def node(state: GraphState) -> Dict[str, Any]:
         verdict_result = critic.run(state)
         verdict = verdict_result.get("critic_verdict")
+=======
+    async def node(state: GraphState) -> Dict[str, Any]:
+        verdict_result = await critic.run(state)
+        verdict = verdict_result.get("critic_verdict", {})
+>>>>>>> theirs
         retry_count = state.get("retry_count", 0)
         if verdict and not verdict.approved and retry_count < settings.max_retries:
             return {**verdict_result, "retry_count": retry_count + 1}

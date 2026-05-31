@@ -71,7 +71,7 @@ class CriticAgent:
         self.registry = model_registry
 
     @mlflow.trace(name="critic")
-    def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Evaluate the synthesised response for faithfulness.
 
@@ -116,13 +116,19 @@ class CriticAgent:
             stop=stop_after_attempt(3),
             reraise=True,
         )
-        def _invoke():
-            return llm.invoke(messages)
+        async def _invoke():
+            return await llm.ainvoke(messages)
 
         try:
+<<<<<<< ours
             resp = _invoke()
             verdict_dict = _parse_verdict(resp.content)
             verdict = CriticVerdict(**verdict_dict)
+=======
+            resp = await _invoke()
+            verdict = _parse_verdict(resp.content)
+            score = float(verdict.get("score", 1.0))
+>>>>>>> theirs
 
             logger.info(
                 "Critic verdict: approved=%s score=%.2f issues=%s",

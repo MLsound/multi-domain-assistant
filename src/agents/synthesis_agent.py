@@ -61,7 +61,7 @@ class SynthesisAgent:
         self.registry = model_registry
 
     @mlflow.trace(name="synthesis")
-    def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Generate a response from retrieved chunks.
 
@@ -132,11 +132,11 @@ class SynthesisAgent:
             stop=stop_after_attempt(3),
             reraise=True,
         )
-        def _invoke():
-            return llm.invoke(messages)
+        async def _invoke():
+            return await llm.ainvoke(messages)
 
         try:
-            resp = _invoke()
+            resp = await _invoke()
             response_text: str = resp.content
             token_count = _extract_token_count(resp)
 
