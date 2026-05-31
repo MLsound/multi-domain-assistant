@@ -62,12 +62,11 @@ data/auth.db-journal
 
 # Mlflow
 mlruns/
+mlartifacts/
 mlflow.db
 
 # Other files
 *.log
-*.pdf
 
 # Other folders
 varios/
-/mlartifacts

@@ -6,20 +6,23 @@ Gemini is mocked via unittest.mock.patch so these tests run without an API key.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from src.agents.synthesis_agent import SynthesisAgent
 from src.agents.state import RetrievalChunk
 
 
 def _make_registry(response_text: str) -> MagicMock:
-    """Build a ModelRegistry mock whose get_llm().invoke() returns response_text."""
+    """Build a ModelRegistry mock whose get_llm().ainvoke() returns response_text."""
     mock_resp = MagicMock()
     mock_resp.content = response_text
     mock_resp.usage_metadata = None
 
     mock_llm = MagicMock()
-    mock_llm.invoke.return_value = mock_resp
+    # Use AsyncMock for ainvoke
+    mock_llm.ainvoke = AsyncMock(return_value=mock_resp)
 
     mock_registry = MagicMock()
     mock_registry.get_llm.return_value = mock_llm
@@ -36,7 +39,8 @@ def _make_chunk(content: str, source_id: str = "test_doc.txt", category: str = "
     )
 
 
-def test_synthesis_with_chunks_returns_response() -> None:
+@pytest.mark.asyncio
+async def test_synthesis_with_chunks_returns_response() -> None:
     registry = _make_registry("PV efficiency degrades with heat.\nSOURCES: [pv_yield_physics.txt]")
     agent = SynthesisAgent(registry)
 
@@ -48,13 +52,14 @@ def test_synthesis_with_chunks_returns_response() -> None:
         "history": [],
         "confidence": 0.9,
     }
-    result = agent.run(state)
+    result = await agent.run(state)
 
     assert "PV efficiency" in result["response"]
     assert "pv_yield_physics.txt" in result["sources_cited"]
 
 
-def test_synthesis_empty_context_returns_fallback() -> None:
+@pytest.mark.asyncio
+async def test_synthesis_empty_context_returns_fallback() -> None:
     registry = _make_registry("This should never be returned.")
     agent = SynthesisAgent(registry)
 
@@ -66,14 +71,15 @@ def test_synthesis_empty_context_returns_fallback() -> None:
         "history": [],
         "confidence": 0.5,
     }
-    result = agent.run(state)
+    result = await agent.run(state)
 
     assert "don't have enough information" in result["response"]
     assert result["sources_cited"] == []
     assert result["token_count"] == 0
 
 
-def test_synthesis_extracts_multiple_sources() -> None:
+@pytest.mark.asyncio
+async def test_synthesis_extracts_multiple_sources() -> None:
     response_text = (
         "The HEMS uses MPPT and WI-SUN standards.\n"
         "SOURCES: [hems_mode_strategies.txt, wi_sun_outlet_logic.txt]"
@@ -92,7 +98,7 @@ def test_synthesis_extracts_multiple_sources() -> None:
         "history": [],
         "confidence": 0.8,
     }
-    result = agent.run(state)
+    result = await agent.run(state)
 
     assert "hems_mode_strategies.txt" in result["sources_cited"]
     assert "wi_sun_outlet_logic.txt" in result["sources_cited"]

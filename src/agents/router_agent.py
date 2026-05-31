@@ -27,7 +27,7 @@ class RouterAgent:
         self.mlp_router = mlp_router
 
     @mlflow.trace(name="router")
-    def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Classify the sanitized query.
 

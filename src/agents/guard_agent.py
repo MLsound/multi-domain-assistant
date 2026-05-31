@@ -44,7 +44,7 @@ class GuardAgent:
     # INPUT phase
     # ------------------------------------------------------------------
     @mlflow.trace(name="guard_input")
-    def validate_input(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def validate_input(self, state: Dict[str, Any]) -> Dict[str, Any]:
         query: str = state.get("query", "")
 
         if not query or not query.strip():
@@ -86,7 +86,7 @@ class GuardAgent:
     # OUTPUT phase
     # ------------------------------------------------------------------
     @mlflow.trace(name="guard_output")
-    def validate_output(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def validate_output(self, state: Dict[str, Any]) -> Dict[str, Any]:
         response: str = state.get("response", "")
 
         if not response or not response.strip():

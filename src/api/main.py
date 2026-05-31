@@ -173,7 +173,7 @@ async def query(
             }
 
             result = await asyncio.wait_for(
-                asyncio.to_thread(_rag_system.app.invoke, inputs),
+                _rag_system.app.ainvoke(inputs),
                 timeout=30.0,
             )
 
