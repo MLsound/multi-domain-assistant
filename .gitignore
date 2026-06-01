@@ -1,5 +1,10 @@
 # Environment
 .env
+.env.local
+.env.test
+
+# Local env overrides (do not commit secrets)
+# Add other local env files as needed (e.g., .env.local, .env.test)
 
 # Python
 *.pyc
@@ -19,6 +24,12 @@ build/
 venv/
 env/
 
+# Editor / tooling caches
+.mypy_cache/
+pip-wheel-metadata/
+.python-version
+pip-delete-this-directory.txt
+
 # Poetry
 # poetry.lock is committed intentionally
 
@@ -33,6 +44,9 @@ models/
 logs/
 reports/
 
+# ML / experiment artifacts
+mlruns/
+
 # HuggingFace cache
 .cache/
 
@@ -40,6 +54,9 @@ reports/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Notebooks
+.ipynb_checkpoints/
 
 # IDE
 .vscode/
@@ -56,3 +73,14 @@ data/auth.db-journal
 
 # Editor / Claude session
 .claude/
+
+# Misc
+node_modules/
+.ropeproject/
+*.sqlite3
+*.db
+
+# Ignore any other files that are not explicitly tracked
+.opencode 
+
+/varios
