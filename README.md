@@ -457,18 +457,90 @@ Uses the same LLM provider as the main pipeline (set via `.env`) — no `GOOGLE_
 
 **MLflow Tracking:** Each evaluation run is automatically tracked in MLflow with parameters (provider, thresholds, n_questions), per-question metrics, aggregate scores, and the results JSON logged as an artifact. View results at `http://localhost:5000`.
 
-**Metrics computed:**
+**Metrics computed (9 — 8 existing + 3 new):**
 
 | Metric | Method | Description |
 |--------|--------|-------------|
 | `faithfulness` | Ragas (LLM) | Fraction of response claims supported by retrieved context |
 | `context_recall` | Ragas (LLM) | Fraction of ground-truth statements retrievable from context |
+| `context_precision` | Ragas (LLM, async) | Whether relevant chunks are ranked higher than irrelevant ones *(NEW)* |
+| `answer_relevancy` | Ragas (LLM, async) | Whether the generated answer addresses the question *(NEW)* |
 | `precision_at_k` | Chunk category match | Fraction of top-5 chunks from the expected domain |
 | `retrieval_time_ms` | Timer | Qdrant search + reranking latency |
 | `total_latency_ms` | Timer | Full pipeline latency per question |
 | `token_count` | LLM metadata | Total tokens consumed by the LLM |
 | `semantic_similarity` | `bge-large-en-v1.5` cosine | Cosine similarity between generated and reference answer |
 | `rouge_l` | `rouge-score` | ROUGE-L F1 between generated and reference answer |
+| `tool_router_success` | Deterministic | Whether the MLP classifier produced a dominant category *(NEW)* |
+| `tool_retrieval_success` | Deterministic | Whether retrieval returned non-empty chunks with positive latency *(NEW)* |
+| `tool_critic_success` | Deterministic | Whether the critic approved on first pass (score=1), required retries (0.5), or no data (0) *(NEW)* |
+| `tool_action_success` | Deterministic | Whether the audit log write succeeded *(NEW)* |
+
+The four `tool_*_success` metrics are deterministic (no LLM required) and measure per-agent tool-call reliability without additional cost.
+
+## Observability & Tracing (MLflow)
+
+The system uses [MLflow](https://mlflow.org/) for end-to-end observability:
+- **Agent-level tracing** — Every agent execution is traced with `@mlflow.trace`, capturing inputs, outputs, latency, and errors as nested spans.
+- **Evaluation tracking** — Each `run_evaluation()` call creates an MLflow run with parameters, per-question metrics (including context_precision, answer_relevancy, and 4 tool-call success flags), aggregate scores, and the results JSON as an artifact.
+- **Tuning recommendations** — After each evaluation run, `_baseline_summary()` compares current metrics against the previous baseline and outputs specific configuration recommendations when regressions are detected.
+- **Experiment comparison** — Compare evaluation runs side-by-side in the MLflow UI to track improvements across prompt changes, model switches, or threshold tuning.
+
+### Starting the MLflow Server
+
+```bash
+# Option 1: Direct launch (SQLite backend, development)
+poetry run mlflow server \
+  --host 127.0.0.1 \
+  --port 5000 \
+  --backend-store-uri sqlite:////$(pwd)/mlflow.db
+
+# Option 2: Docker Compose (recommended for team access)
+docker compose up mlflow
+```
+
+The Docker Compose configuration uses `sqlite:////mlflow/mlflow.db` (absolute path) with a named volume `mlflow_data` for persistence.
+
+### Troubleshooting
+
+**MLflow UI shows no traces:** Ensure `mlflow_manager.initialise()` runs before any `@mlflow.trace` decorated methods. The API lifespan handler handles this automatically. If traces still don't appear, check that `MLFLOW_TRACKING_URI` in `.env` matches the running server address.
+
+**Container name conflicts:** If you previously ran containers via `docker run`, remove them before using `docker compose`:
+```bash
+docker rm -f mlflow_server qdrant_rag
+```
+
+### Viewing Traces
+
+Open `http://localhost:5000` in your browser. You will see:
+
+1. **Experiments** — The `knowledge-assistant` experiment contains all runs.
+2. **Runs** — Each evaluation or API request appears as a run with:
+   - **Parameters** (provider, thresholds, n_questions)
+   - **Metrics** (faithfulness, context_recall, latency, etc.)
+   - **Traces** (nested span tree showing the full agent execution path)
+   - **Artifacts** (evaluation_results.json)
+
+### Trace Hierarchy
+
+```
+root span: "rag_graph" (per /query request)
+  ├── cache_check        → cache_hit (bool), query (str)
+  ├── guard_input        → is_safe (bool), injection_score (float)
+  ├── router             → dominant_category (str), confidence (float)
+  ├── retrieval          → chunk_count (int), retrieval_time_ms (float)
+  ├── synthesis          → response (str), token_count (int), provider (str)
+  ├── critic             → verdict (str), score (float), retry_count (int)
+  ├── guard_output       → pii_redacted (int), canary_leak (bool)
+  └── action             → audit_success (bool), webhook_success (bool)
+```
+
+### Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MLFLOW_TRACKING_URI` | `http://localhost:5000` | MLflow server URL |
+| `MLFLOW_EXPERIMENT_NAME` | `knowledge-assistant` | Experiment name for all runs |
 
 ## Observability & Tracing (MLflow)
 
@@ -536,7 +608,7 @@ root span: "rag_graph" (per /query request)
 ## Testing
 
 ```bash
-# Run all 67 tests
+# Run all 78 tests
 poetry run pytest tests/ -v
 
 # Run only fast unit tests (no external dependencies)
@@ -557,6 +629,7 @@ poetry run pytest tests/ -v \
 | `test_integration.py` | Full graph pipeline — domain routing, overrides | 3 |
 | `test_auth.py` | Auth — password hashing, JWT, register/login/me flow, roles | 8 |
 | `test_security.py` | Red-team — injection scoring, PII redaction, canary tokens | 30 |
+| `test_metrics.py` | Tool-call success flags, robust async scorer with retry | 11 |
 
 ## Optional Provider Installation
 

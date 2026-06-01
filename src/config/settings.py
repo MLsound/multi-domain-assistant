@@ -125,6 +125,12 @@ class Settings(BaseSettings):
     enable_tracing: bool = True  # MLflow tracing enabled by default
 
     # ------------------------------------------------------------------
+    # MLflow tracking
+    # ------------------------------------------------------------------
+    mlflow_tracking_uri: str = "http://localhost:5000"
+    mlflow_experiment_name: str = "knowledge-assistant"
+
+    # ------------------------------------------------------------------
     # Document ingestion / chunking
     # ------------------------------------------------------------------
     chunk_size: int = 512
