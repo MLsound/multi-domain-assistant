@@ -542,6 +542,69 @@ root span: "rag_graph" (per /query request)
 | `MLFLOW_TRACKING_URI` | `http://localhost:5000` | MLflow server URL |
 | `MLFLOW_EXPERIMENT_NAME` | `knowledge-assistant` | Experiment name for all runs |
 
+## Observability & Tracing (MLflow)
+
+The system uses [MLflow](https://mlflow.org/) for end-to-end observability:
+- **Agent-level tracing** — Every agent execution is traced with `@mlflow.trace`, capturing inputs, outputs, latency, and errors as nested spans.
+- **Evaluation tracking** — Each `run_evaluation()` call creates an MLflow run with parameters, per-question metrics, aggregate scores, and the results JSON as an artifact.
+- **Experiment comparison** — Compare evaluation runs side-by-side in the MLflow UI to track improvements across prompt changes, model switches, or threshold tuning.
+
+### Starting the MLflow Server
+
+```bash
+# Option 1: Direct launch (SQLite backend, development)
+poetry run mlflow server \
+  --host 127.0.0.1 \
+  --port 5000 \
+  --backend-store-uri sqlite:////$(pwd)/mlflow.db
+
+# Option 2: Docker Compose (recommended for team access)
+docker compose up mlflow
+```
+
+The Docker Compose configuration uses `sqlite:////mlflow/mlflow.db` (absolute path) with a named volume `mlflow_data` for persistence.
+
+### Troubleshooting
+
+**MLflow UI shows no traces:** Ensure `mlflow_manager.initialise()` runs before any `@mlflow.trace` decorated methods. The API lifespan handler handles this automatically. If traces still don't appear, check that `MLFLOW_TRACKING_URI` in `.env` matches the running server address.
+
+**Container name conflicts:** If you previously ran containers via `docker run`, remove them before using `docker compose`:
+```bash
+docker rm -f mlflow_server qdrant_rag
+```
+
+### Viewing Traces
+
+Open `http://localhost:5000` in your browser. You will see:
+
+1. **Experiments** — The `knowledge-assistant` experiment contains all runs.
+2. **Runs** — Each evaluation or API request appears as a run with:
+   - **Parameters** (provider, thresholds, n_questions)
+   - **Metrics** (faithfulness, context_recall, latency, etc.)
+   - **Traces** (nested span tree showing the full agent execution path)
+   - **Artifacts** (evaluation_results.json)
+
+### Trace Hierarchy
+
+```
+root span: "rag_graph" (per /query request)
+  ├── cache_check        → cache_hit (bool), query (str)
+  ├── guard_input        → is_safe (bool), injection_score (float)
+  ├── router             → dominant_category (str), confidence (float)
+  ├── retrieval          → chunk_count (int), retrieval_time_ms (float)
+  ├── synthesis          → response (str), token_count (int), provider (str)
+  ├── critic             → verdict (str), score (float), retry_count (int)
+  ├── guard_output       → pii_redacted (int), canary_leak (bool)
+  └── action             → audit_success (bool), webhook_success (bool)
+```
+
+### Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MLFLOW_TRACKING_URI` | `http://localhost:5000` | MLflow server URL |
+| `MLFLOW_EXPERIMENT_NAME` | `knowledge-assistant` | Experiment name for all runs |
+
 ## Testing
 
 ```bash

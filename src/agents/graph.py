@@ -26,7 +26,7 @@ from src.agents.critic_agent import CriticAgent
 from src.agents.guard_agent import GuardAgent
 from src.agents.retrieval_agent import RetrievalAgent
 from src.agents.router_agent import RouterAgent
-from src.agents.state import GraphState
+from src.agents.state import GraphState, CriticVerdict, GuardResult
 from src.agents.synthesis_agent import SynthesisAgent
 from src.cache.semantic_cache import SemanticCache
 from src.config.model_registry import ModelRegistry
@@ -50,22 +50,22 @@ def _cache_decision(state: GraphState) -> Literal["hit", "miss"]:
 
 def _guard_decision(state: GraphState) -> Literal["proceed", "blocked"]:
     """Stop the pipeline early if the input guard rejected the query."""
-    result = state.get("guard_input_result") or {}
-    return "proceed" if result.get("is_safe") else "blocked"
+    result = state.get("guard_input_result")
+    return "proceed" if result and result.is_safe else "blocked"
 
 
 def _critic_decision(
     state: GraphState,
 ) -> Literal["approve", "retry"]:
     """Drive the retry loop: retry retrieval or proceed to output guard."""
-    verdict = state.get("critic_verdict") or {}
+    verdict = state.get("critic_verdict")
     retry_count: int = state.get("retry_count", 0)
 
     if retry_count >= settings.max_retries:
         logger.info("Critic: max_retries reached — force-approving")
         return "approve"
 
-    return "approve" if verdict.get("approved") else "retry"
+    return "approve" if (verdict and verdict.approved) else "retry"
 
 
 # ---------------------------------------------------------------------------
@@ -75,7 +75,7 @@ def _critic_decision(
 def _make_cache_check_node(cache: SemanticCache):
     """Return a node function that checks the semantic cache."""
 
-    def cache_check(state: GraphState) -> Dict[str, Any]:
+    async def cache_check(state: GraphState) -> Dict[str, Any]:
         query = state.get("query", "")
         hit = cache.check(query)
         if hit:
@@ -90,9 +90,16 @@ def _make_cache_check_node(cache: SemanticCache):
                 "retrieval_time_ms": 0.0,
                 "token_count": 0,
                 "retry_count": 0,
-                "critic_verdict": {"approved": True, "score": 1.0,
-                                   "issues": [], "suggested_refinement": None},
-                "guard_output_result": {"is_safe": True, "validated_response": hit.get("response", "")},
+                "critic_verdict": CriticVerdict(
+                    approved=True,
+                    score=1.0,
+                    issues=[],
+                    suggested_refinement=None
+                ),
+                "guard_output_result": GuardResult(
+                    is_safe=True,
+                    validated_response=hit.get("response", "")
+                ),
             }
         return {"from_cache": False}
 
@@ -100,10 +107,11 @@ def _make_cache_check_node(cache: SemanticCache):
 
 
 def _make_guard_input_node(guard: GuardAgent):
-    def node(state: GraphState) -> Dict[str, Any]:
-        result = guard.validate_input(state)
-        if not result.get("guard_input_result", {}).get("is_safe"):
-            reason = result["guard_input_result"].get("rejection_reason", "Query rejected")
+    async def node(state: GraphState) -> Dict[str, Any]:
+        result = await guard.validate_input(state)
+        guard_result = result.get("guard_input_result")
+        if guard_result and not guard_result.is_safe:
+            reason = guard_result.rejection_reason or "Query rejected"
             result["response"] = f"Request blocked: {reason}"
         return result
     return node
@@ -118,15 +126,16 @@ _UNCACHEABLE_RESPONSES = {
 
 
 def _make_guard_output_node(guard: GuardAgent, cache: SemanticCache):
-    def node(state: GraphState) -> Dict[str, Any]:
-        result = guard.validate_output(state)
-        validated = result.get("guard_output_result", {}).get("validated_response", "")
+    async def node(state: GraphState) -> Dict[str, Any]:
+        result = await guard.validate_output(state)
+        guard_result = result.get("guard_output_result")
+        validated = guard_result.validated_response if guard_result else ""
 
         # Only cache safe, substantive responses with at least one cited source.
         # Never cache fallback / error messages — doing so poisons the cache and
         # causes every repeated query to return the error instead of retrying.
         should_cache = (
-            result["guard_output_result"]["is_safe"]
+            guard_result and guard_result.is_safe
             and not state.get("from_cache")
             and bool(state.get("sources_cited"))
             and validated.strip().lower() not in _UNCACHEABLE_RESPONSES
@@ -148,11 +157,11 @@ def _make_guard_output_node(guard: GuardAgent, cache: SemanticCache):
 def _make_critic_node(critic: CriticAgent):
     """Wrap CriticAgent.run() and increment retry_count on rejection."""
 
-    def node(state: GraphState) -> Dict[str, Any]:
-        verdict_result = critic.run(state)
-        verdict = verdict_result.get("critic_verdict", {})
+    async def node(state: GraphState) -> Dict[str, Any]:
+        verdict_result = await critic.run(state)
+        verdict = verdict_result.get("critic_verdict")
         retry_count = state.get("retry_count", 0)
-        if not verdict.get("approved") and retry_count < settings.max_retries:
+        if verdict and not verdict.approved and retry_count < settings.max_retries:
             return {**verdict_result, "retry_count": retry_count + 1}
         return verdict_result
 

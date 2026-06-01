@@ -7,12 +7,15 @@ Usage:
     poetry run python scripts/run_evaluation.py --questions data/eval/test_suite.json
     poetry run python scripts/run_evaluation.py --output reports/my_run.json
 
+See `docs/CONTEXT.md` for details on the evaluation domains (Science, Software, User).
+
 Requires GOOGLE_API_KEY in environment (or .env file).
 """
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import logging
 import sys
 from pathlib import Path
@@ -30,7 +33,7 @@ logging.basicConfig(
 )
 
 
-def main() -> None:
+async def main_async() -> None:
     parser = argparse.ArgumentParser(
         description="Run Knowledge Assistant evaluation suite"
     )
@@ -48,7 +51,7 @@ def main() -> None:
 
     from src.evaluation.eval_runner import run_evaluation
 
-    results = run_evaluation(
+    results = await run_evaluation(
         test_suite_path=args.questions,
         output_path=args.output,
     )
@@ -61,4 +64,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main_async())

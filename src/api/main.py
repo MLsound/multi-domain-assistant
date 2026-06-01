@@ -28,6 +28,7 @@ from src.auth.database import get_db, init_db
 from src.auth.deps import get_current_user
 from src.auth.models import QueryRecord, User
 from src.auth.router import router as auth_router
+from src.config.mlflow_config import manager as mlflow_manager
 from src.config.settings import settings
 from src.security.rate_limiter import limiter
 
@@ -54,6 +55,13 @@ _rag_system = None
 async def lifespan(app: FastAPI):
     """Initialise heavy resources once at startup."""
     global _rag_system
+
+    # CRITICAL: Set MLflow tracking URI BEFORE any @mlflow.trace decorated
+    # methods are called. The decorators capture mlflow module state at call
+    # time, not at import time, so this must run before RAGGraph initialisation.
+    mlflow_manager.initialise()
+    logger.info("MLflow tracking URI set to %s", settings.mlflow_tracking_uri)
+
     init_db()
     logger.info("Auth DB ready")
 
@@ -71,7 +79,9 @@ app = FastAPI(
     version="0.3.0",
     description=(
         "Multi-agent Agentic RAG for sustainable energy and smart building "
-        "knowledge. Hardened against OWASP Top-10 LLM threats; user-aware."
+        "knowledge. Hardened against OWASP Top-10 LLM threats; user-aware. "
+        "See `docs/CONTEXT.md` for details on the specific application context "
+        "used in this deployment."
     ),
     lifespan=lifespan,
 )
@@ -128,94 +138,111 @@ async def query(
     if user.queries_today >= user.quota_queries_per_day:
         raise HTTPException(status_code=429, detail="Daily query quota exceeded")
 
-    t0 = time.perf_counter()
-    try:
-        # Session id is namespaced by user so two users cannot share state.
-        scoped_session = f"u{user.id}:{req.session_id or 'default'}"
+    with mlflow_manager.start_run(
+        run_name=f"query-u{user.id}-{int(time.time())}",
+        tags={"user_id": str(user.id), "session_id": req.session_id or "default"},
+    ):
+        mlflow_manager.log_params({
+            "query_length": len(req.query),
+            "session_id": req.session_id or "default",
+            "is_help_override": req.is_help_override,
+        })
 
-        inputs = {
-            "query": req.query,
-            "session_id": scoped_session,
-            "is_help_section": req.is_help_override,
-            "history": [],
-            "retry_count": 0,
-            "from_cache": False,
-            "sanitized_query": "",
-            "guard_input_result": {},
-            "guard_output_result": {},
-            "category_probs": {},
-            "dominant_category": "",
-            "confidence": 0.0,
-            "retrieved_chunks": [],
-            "context_metadata": {},
-            "retrieval_time_ms": 0.0,
-            "sources_cited": [],
-            "response": "",
-            "token_count": 0,
-            "critic_verdict": {},
-            "action_result": {},
-        }
+        t0 = time.perf_counter()
+        try:
+            # Session id is namespaced by user so two users cannot share state.
+            scoped_session = f"u{user.id}:{req.session_id or 'default'}"
 
-        result = await asyncio.wait_for(
-            asyncio.to_thread(_rag_system.app.invoke, inputs),
-            timeout=30.0,
-        )
+            inputs = {
+                "query": req.query,
+                "session_id": scoped_session,
+                "is_help_section": req.is_help_override,
+                "history": [],
+                "retry_count": 0,
+                "from_cache": False,
+                "sanitized_query": "",
+                "category_probs": {},
+                "dominant_category": "",
+                "confidence": 0.0,
+                "retrieved_chunks": [],
+                "context_metadata": {},
+                "retrieval_time_ms": 0.0,
+                "sources_cited": [],
+                "response": "",
+                "token_count": 0,
+            }
 
-        latency_ms = (time.perf_counter() - t0) * 1000
-        _metrics["total_requests"] += 1
-        _metrics["total_latency_ms"] += latency_ms
-        if result.get("from_cache"):
-            _metrics["cache_hits"] += 1
+            result = await asyncio.wait_for(
+                _rag_system.app.ainvoke(inputs),
+                timeout=30.0,
+            )
 
-        guard_in = result.get("guard_input_result") or {}
-        guard_out = result.get("guard_output_result") or {}
-        blocked = not guard_in.get("is_safe", True)
-        if blocked:
-            _metrics["blocked_by_guard"] += 1
-        pii_in = guard_in.get("pii_detections") or []
-        pii_out = guard_out.get("pii_redacted_on_output") or []
-        if pii_in or pii_out:
-            _metrics["pii_redacted"] += 1
+            latency_ms = (time.perf_counter() - t0) * 1000
+            _metrics["total_requests"] += 1
+            _metrics["total_latency_ms"] += latency_ms
+            if result.get("from_cache"):
+                _metrics["cache_hits"] += 1
 
-        # Per-user persistent log
-        user.queries_today += 1
-        rec = QueryRecord(
-            user_id=user.id,
-            session_id=scoped_session,
-            query=req.query[:1000],
-            response_preview=(result.get("response", "") or "")[:500],
-            dominant_category=result.get("dominant_category", ""),
-            confidence=result.get("confidence", 0.0),
-            latency_ms=latency_ms,
-            blocked_by_guard=blocked,
-        )
-        db.add(rec)
-        db.commit()
+            guard_in = result.get("guard_input_result")
+            guard_out = result.get("guard_output_result")
+            blocked = not guard_in.is_safe if guard_in else False
+            if blocked:
+                _metrics["blocked_by_guard"] += 1
+            pii_in = guard_in.pii_detections if guard_in else []
+            pii_out = guard_out.pii_redacted_on_output if guard_out else []
+            if pii_in or pii_out:
+                _metrics["pii_redacted"] += 1
 
-        return QueryResponse(
-            response=result.get("response", ""),
-            sources_cited=result.get("sources_cited", []),
-            category_probs=result.get("category_probs", {}),
-            dominant_category=result.get("dominant_category", ""),
-            confidence=result.get("confidence", 0.0),
-            retrieval_time_ms=result.get("retrieval_time_ms", 0.0),
-            token_count=result.get("token_count", 0),
-            retry_count=result.get("retry_count", 0),
-            from_cache=result.get("from_cache", False),
-            injection_score=guard_in.get("injection_score", 0.0),
-            injection_decision=guard_in.get("injection_decision", "allow"),
-            pii_redacted_count=len(pii_in) + len(pii_out),
-        )
+            # Log response metrics to MLflow
+            mlflow_manager.log_metrics({
+                "latency_ms": round(latency_ms, 2),
+                "token_count": result.get("token_count", 0),
+                "confidence": result.get("confidence", 0.0),
+                "retry_count": result.get("retry_count", 0),
+                "retrieval_time_ms": result.get("retrieval_time_ms", 0.0),
+                "from_cache": 1 if result.get("from_cache") else 0,
+                "blocked_by_guard": 1 if blocked else 0,
+            })
 
-    except asyncio.TimeoutError:
-        _metrics["errors"] += 1
-        raise HTTPException(status_code=504, detail="Request timed out after 30 seconds")
-    except HTTPException:
-        raise
-    except Exception as exc:
-        _metrics["errors"] += 1
-        logger.exception("Unhandled error processing query")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+            # Per-user persistent log
+            user.queries_today += 1
+            rec = QueryRecord(
+                user_id=user.id,
+                session_id=scoped_session,
+                query=req.query[:1000],
+                response_preview=(result.get("response", "") or "")[:500],
+                dominant_category=result.get("dominant_category", ""),
+                confidence=result.get("confidence", 0.0),
+                latency_ms=latency_ms,
+                blocked_by_guard=blocked,
+            )
+            db.add(rec)
+            db.commit()
+
+            return QueryResponse(
+                response=result.get("response", ""),
+                sources_cited=result.get("sources_cited", []),
+                category_probs=result.get("category_probs", {}),
+                dominant_category=result.get("dominant_category", ""),
+                confidence=result.get("confidence", 0.0),
+                retrieval_time_ms=result.get("retrieval_time_ms", 0.0),
+                token_count=result.get("token_count", 0),
+                retry_count=result.get("retry_count", 0),
+                from_cache=result.get("from_cache", False),
+                injection_score=guard_in.injection_score if guard_in else 0.0,
+                injection_decision=guard_in.injection_decision if guard_in else "allow",
+                pii_redacted_count=len(pii_in) + len(pii_out),
+            )
+
+        except asyncio.TimeoutError:
+            _metrics["errors"] += 1
+            raise HTTPException(status_code=504, detail="Request timed out after 30 seconds")
+        except HTTPException:
+            raise
+        except Exception as exc:
+            _metrics["errors"] += 1
+            logger.exception("Unhandled error processing query")
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.get("/me/queries", response_model=List[QueryRecordOut])
@@ -260,7 +287,7 @@ async def health():
 @app.get("/metrics")
 async def metrics():
     n = _metrics["total_requests"]
-    return {
+    result = {
         "total_requests": n,
         "avg_latency_ms": round(_metrics["total_latency_ms"] / n, 2) if n else 0.0,
         "error_rate": round(_metrics["errors"] / n, 4) if n else 0.0,
@@ -271,3 +298,14 @@ async def metrics():
         "total_errors": _metrics["errors"],
         "total_cache_hits": _metrics["cache_hits"],
     }
+    # Log aggregate metrics to MLflow (best-effort)
+    try:
+        mlflow_manager.log_metrics({
+            "api.total_requests": n,
+            "api.avg_latency_ms": result["avg_latency_ms"],
+            "api.error_rate": result["error_rate"],
+            "api.cache_hit_rate": result["cache_hit_rate"],
+        })
+    except Exception:
+        pass
+    return result

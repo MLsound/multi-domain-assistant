@@ -18,6 +18,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict
 
+import mlflow
+
 from langchain_core.messages import HumanMessage, SystemMessage
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -58,7 +60,8 @@ class SynthesisAgent:
     def __init__(self, model_registry: ModelRegistry) -> None:
         self.registry = model_registry
 
-    def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    @mlflow.trace(name="synthesis")
+    async def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Generate a response from retrieved chunks.
 
@@ -76,9 +79,9 @@ class SynthesisAgent:
 
         # Build context string with source tags
         context_parts = [
-            f"[{c.get('category', '?')}]"
-            f"[source:{c.get('metadata', {}).get('source_id', 'unknown')}] "
-            f"{c.get('content', '')}"
+            f"[{c.category}]"
+            f"[source:{c.metadata.get('source_id', 'unknown')}] "
+            f"{c.content}"
             for c in chunks
         ]
         context_str = "\n\n".join(context_parts)
@@ -102,7 +105,7 @@ class SynthesisAgent:
         if history:
             recent = history[-3:]
             history_str = "\n\nConversation history:\n" + "\n".join(
-                f"User: {h.get('query', '')}\nAssistant: {h.get('response', '')}"
+                f"User: {h.query}\nAssistant: {h.response}"
                 for h in recent
             )
 
@@ -129,11 +132,11 @@ class SynthesisAgent:
             stop=stop_after_attempt(3),
             reraise=True,
         )
-        def _invoke():
-            return llm.invoke(messages)
+        async def _invoke():
+            return await llm.ainvoke(messages)
 
         try:
-            resp = _invoke()
+            resp = await _invoke()
             response_text: str = resp.content
             token_count = _extract_token_count(resp)
 

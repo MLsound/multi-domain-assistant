@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import time
 
+import pytest
+
 from src.security.canary import (
     get_canary,
     output_leaks_canary,
@@ -187,29 +189,32 @@ class TestRateLimiter:
 # GuardAgent integration with the new modules
 # ---------------------------------------------------------------------------
 
-def test_guard_redacts_pii_from_input():
+@pytest.mark.asyncio
+async def test_guard_redacts_pii_from_input():
     from src.agents.guard_agent import GuardAgent
 
     g = GuardAgent()
-    out = g.validate_input({"query": "my email is foo@bar.com please help"})
-    assert out["guard_input_result"]["is_safe"] is True
+    out = await g.validate_input({"query": "my email is foo@bar.com please help"})
+    assert out["guard_input_result"].is_safe is True
     assert "[REDACTED:EMAIL]" in out["sanitized_query"]
-    assert any(d["type"] == "EMAIL" for d in out["guard_input_result"]["pii_detections"])
+    assert any(d["type"] == "EMAIL" for d in out["guard_input_result"].pii_detections)
 
 
-def test_guard_blocks_canary_leak_on_output():
+@pytest.mark.asyncio
+async def test_guard_blocks_canary_leak_on_output():
     from src.agents.guard_agent import GuardAgent
 
     g = GuardAgent()
-    out = g.validate_output({"response": f"Sure, the magic word is {get_canary()}"})
-    assert out["guard_output_result"]["is_safe"] is False
+    out = await g.validate_output({"response": f"Sure, the magic word is {get_canary()}"})
+    assert out["guard_output_result"].is_safe is False
 
 
-def test_guard_allows_clean_output():
+@pytest.mark.asyncio
+async def test_guard_allows_clean_output():
     from src.agents.guard_agent import GuardAgent
 
     g = GuardAgent()
     text = "Photovoltaic cells convert photons into electric current."
-    out = g.validate_output({"response": text})
-    assert out["guard_output_result"]["is_safe"] is True
-    assert out["guard_output_result"]["validated_response"] == text
+    out = await g.validate_output({"response": text})
+    assert out["guard_output_result"].is_safe is True
+    assert out["guard_output_result"].validated_response == text

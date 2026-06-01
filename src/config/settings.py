@@ -118,11 +118,11 @@ class Settings(BaseSettings):
     audit_log_path: str = "logs/audit.jsonl"
 
     # ------------------------------------------------------------------
-    # Observability / tracing
+    # Observability / MLflow
     # ------------------------------------------------------------------
-    enable_tracing: bool = False
-    langchain_api_key: Optional[str] = None
-    agent_traces_path: str = "logs/agent_traces.jsonl"
+    mlflow_tracking_uri: str = "http://localhost:5000"
+    mlflow_experiment_name: str = "knowledge-assistant"
+    enable_tracing: bool = True  # MLflow tracing enabled by default
 
     # ------------------------------------------------------------------
     # MLflow tracking

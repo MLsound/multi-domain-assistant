@@ -18,9 +18,12 @@ import json
 import logging
 from typing import Any, Dict
 
+import mlflow
+
 from langchain_core.messages import HumanMessage, SystemMessage
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from src.agents.state import CriticVerdict
 from src.config.model_registry import ModelRegistry
 from src.config.settings import settings
 
@@ -41,12 +44,12 @@ _CRITIC_SYSTEM_PROMPT = (
     "Return ONLY the JSON object. No preamble, no explanation, no markdown fences."
 )
 
-_DEFAULT_VERDICT: Dict[str, Any] = {
-    "approved": True,
-    "score": 1.0,
-    "issues": [],
-    "suggested_refinement": None,
-}
+_DEFAULT_VERDICT = CriticVerdict(
+    approved=True,
+    score=1.0,
+    issues=[],
+    suggested_refinement=None,
+)
 
 
 def _parse_verdict(raw: str) -> Dict[str, Any]:
@@ -67,7 +70,8 @@ class CriticAgent:
     def __init__(self, model_registry: ModelRegistry) -> None:
         self.registry = model_registry
 
-    def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    @mlflow.trace(name="critic")
+    async def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Evaluate the synthesised response for faithfulness.
 
@@ -91,7 +95,7 @@ class CriticAgent:
             return {"critic_verdict": _DEFAULT_VERDICT}
 
         context_str = "\n\n".join(
-            f"[source:{c.get('metadata', {}).get('source_id', '?')}] {c.get('content', '')}"
+            f"[source:{c.metadata.get('source_id', '?')}] {c.content}"
             for c in chunks
         )
 
@@ -112,19 +116,19 @@ class CriticAgent:
             stop=stop_after_attempt(3),
             reraise=True,
         )
-        def _invoke():
-            return llm.invoke(messages)
+        async def _invoke():
+            return await llm.ainvoke(messages)
 
         try:
-            resp = _invoke()
-            verdict = _parse_verdict(resp.content)
-            score = float(verdict.get("score", 1.0))
+            resp = await _invoke()
+            verdict_dict = _parse_verdict(resp.content)
+            verdict = CriticVerdict(**verdict_dict)
 
             logger.info(
                 "Critic verdict: approved=%s score=%.2f issues=%s",
-                verdict.get("approved"),
-                score,
-                verdict.get("issues", []),
+                verdict.approved,
+                verdict.score,
+                verdict.issues,
             )
             return {"critic_verdict": verdict}
 

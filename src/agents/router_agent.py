@@ -12,6 +12,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict
 
+import mlflow
+
 from src.config.settings import settings
 from src.router.mlp_router import MLPRouter
 
@@ -24,7 +26,8 @@ class RouterAgent:
     def __init__(self, mlp_router: MLPRouter) -> None:
         self.mlp_router = mlp_router
 
-    def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    @mlflow.trace(name="router")
+    async def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Classify the sanitized query.
 

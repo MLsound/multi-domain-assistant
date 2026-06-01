@@ -11,10 +11,12 @@ regardless of log level, so developers can always see which LLM is in use.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Literal
 
 from langchain_core.language_models import BaseChatModel
 
+from src.config.mlflow_config import manager as mlflow_manager
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -71,6 +73,10 @@ def _build_llm(
             if complexity == "simple"
             else settings.gemini_model_complex
         )
+        try:
+            mlflow_manager.log_params({f"model_{complexity}": model})
+        except Exception:
+            pass
         return ChatGoogleGenerativeAI(
             model=model,
             google_api_key=settings.google_api_key,
@@ -83,6 +89,10 @@ def _build_llm(
             raise ImportError(
                 "Anthropic provider requires: poetry install --extras anthropic"
             ) from exc
+        try:
+            mlflow_manager.log_params({f"model_{complexity}": settings.claude_model})
+        except Exception:
+            pass
         return ChatAnthropic(
             model=settings.claude_model,
             anthropic_api_key=settings.anthropic_api_key,
@@ -100,6 +110,10 @@ def _build_llm(
             if complexity == "simple"
             else settings.groq_model_complex
         )
+        try:
+            mlflow_manager.log_params({f"model_{complexity}": model})
+        except Exception:
+            pass
         return ChatGroq(model=model, groq_api_key=settings.groq_api_key)
 
     if provider == "openrouter":
@@ -114,6 +128,10 @@ def _build_llm(
             if complexity == "simple"
             else settings.openrouter_model_complex
         )
+        try:
+            mlflow_manager.log_params({f"model_{complexity}": model})
+        except Exception:
+            pass
         return ChatOpenAI(
             model=model,
             base_url="https://openrouter.ai/api/v1",
@@ -127,6 +145,10 @@ def _build_llm(
             raise ImportError(
                 "Kimi provider requires: poetry install --extras moonshot"
             ) from exc
+        try:
+            mlflow_manager.log_params({f"model_{complexity}": settings.kimi_model})
+        except Exception:
+            pass
         return ChatMoonshot(
             model=settings.kimi_model,
             moonshot_api_key=settings.moonshot_api_key,
@@ -139,6 +161,10 @@ def _build_llm(
             raise ImportError(
                 "Ollama provider requires: poetry install --extras ollama"
             ) from exc
+        try:
+            mlflow_manager.log_params({f"model_{complexity}": settings.ollama_model})
+        except Exception:
+            pass
         return ChatOllama(
             model=settings.ollama_model,
             base_url=settings.ollama_base_url,
@@ -162,6 +188,15 @@ class ModelRegistry:
     def __init__(self) -> None:
         self._provider = _detect_provider()
         self._announce_provider()
+
+        # Log provider details to MLflow (best-effort, no-op if no active run)
+        try:
+            mlflow_manager.log_params({
+                "provider": self._provider,
+                "provider_selection_mode": "forced" if os.getenv("LLM_PROVIDER") not in (None, "auto") else "auto",
+            })
+        except Exception:
+            pass
 
     def _announce_provider(self) -> None:
         _labels = {

@@ -23,9 +23,12 @@ Contains procedural instructions and safety protocols for end-users and technici
 
 ## Cross-Domain Enrichment (Environmental Data)
 
-A unique feature of this test is the **Environmental Metadata Injection**. When the system detects a query related to the **Science** domain, it automatically triggers a mock MCP (Model Context Protocol) tool that provides real-time environmental variables:
+A unique feature of this test is the **Environmental Metadata Injection**. When the system detects a query related to the **Science** domain, it automatically triggers a mock MCP (Model Context Protocol) tool that provides real-time, dynamic (randomized within logical ranges) environmental variables:
 *   **Temperature (2m)**
+*   **Humidity**
 *   **Total Precipitation**
+*   **Wind Speed & Direction**
+*   **Air Pressure**
 *   **Soil Temperature & Moisture**
 
 This data is injected into the LLM's context alongside the retrieved document chunks, allowing for grounded responses that combine static research data with dynamic environmental conditions.

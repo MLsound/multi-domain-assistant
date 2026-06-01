@@ -15,6 +15,8 @@ import logging
 import time
 from typing import Any, Dict
 
+import mlflow
+
 from src.config.settings import settings
 from src.retrieval.weighted_retriever import WeightedRetriever
 from src.tools.weather_mcp import get_environmental_data
@@ -28,7 +30,8 @@ class RetrievalAgent:
     def __init__(self, retriever: WeightedRetriever) -> None:
         self.retriever = retriever
 
-    def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    @mlflow.trace(name="retrieval")
+    async def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Retrieve context chunks for the current query.
 
@@ -43,8 +46,8 @@ class RetrievalAgent:
         # On retry, append critic's refinement hint to the query
         retry_count: int = state.get("retry_count", 0)
         if retry_count > 0:
-            verdict = state.get("critic_verdict") or {}
-            refinement = verdict.get("suggested_refinement")
+            verdict = state.get("critic_verdict")
+            refinement = verdict.suggested_refinement if verdict else None
             if refinement:
                 query = f"{query} {refinement}"
                 logger.info(
@@ -69,14 +72,14 @@ class RetrievalAgent:
         context_metadata: Dict[str, Any] = {}
         if probs.get("Science", 0) > settings.science_threshold:
             try:
-                env_data = get_environmental_data.invoke({})
+                env_data = await get_environmental_data.ainvoke({})
                 context_metadata = {"environmental_conditions": env_data}
                 logger.debug("Environmental metadata injected: %s", env_data)
             except Exception:
                 logger.warning("MCP tool failed — proceeding without env data")
 
         sources = list({
-            c.get("metadata", {}).get("source_id", "unknown")
+            c.metadata.get("source_id", "unknown")
             for c in chunks
         })
 

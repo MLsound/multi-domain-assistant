@@ -1,3 +1,10 @@
+"""
+Smoke test script for the RAG pipeline.
+
+Runs a few hardcoded queries to verify the basic flow.
+See `docs/CONTEXT.md` for the domain context of these tests.
+"""
+
 from src.agents.graph import RAGGraph
 from dotenv import load_dotenv
 import os

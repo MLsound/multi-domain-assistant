@@ -31,6 +31,7 @@ def chat() -> None:
     print("Type 'exit' or 'quit' to end the session.\n")
 
     session_id = "cli-session"
+    is_help = input("[Help section override? (y/n)] > ").strip().lower() == "y"
 
     while True:
         try:
@@ -38,8 +39,6 @@ def chat() -> None:
             if query.lower() in {"exit", "quit", ""}:
                 print("\nEnding session. Goodbye!")
                 break
-
-            is_help = input("[Help section override? (y/n)] > ").strip().lower() == "y"
 
             inputs = {
                 "query": query,

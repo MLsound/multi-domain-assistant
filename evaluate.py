@@ -3,6 +3,8 @@ Backward-compatible evaluation entry point.
 
 Delegates all logic to src/evaluation/eval_runner.py.
 Can still be run directly: poetry run python evaluate.py
+
+See `docs/CONTEXT.md` for details on the evaluation domains (Science, Software, User).
 """
 
 from __future__ import annotations
