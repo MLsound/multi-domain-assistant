@@ -2,6 +2,17 @@
 
 > Resolves issue #4 — *Implement domain/service layer for architectural separation.*
 
+## Screenshots
+
+API surface and a live run of the user-management endpoints through the
+refactored layer (captured against a running instance):
+
+| | |
+|---|---|
+| Swagger UI (`/docs`) | ![Swagger UI](screenshots/01-swagger-docs.png) |
+| ReDoc (`/redoc`)     | ![ReDoc](screenshots/02-redoc.png) |
+| User admin flow (register → login → me → history) | ![User admin flow](screenshots/03-user-admin-flow.png) |
+
 ## Motivation
 
 The FastAPI `/query` handler in `src/api/main.py` previously mixed three
