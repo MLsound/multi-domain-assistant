@@ -38,7 +38,8 @@ def client():
     with patch("src.agents.graph.ModelRegistry") as mock_registry_cls, \
          patch("src.agents.graph.MLPRouter"), \
          patch("src.agents.graph.WeightedRetriever"), \
-         patch("src.agents.graph.SemanticCache") as mock_cache_cls:
+         patch("src.agents.graph.SemanticCache") as mock_cache_cls, \
+         patch("src.api.main.mlflow_manager") as mock_mlflow_manager:
 
         # Registry mock
         mock_registry = MagicMock()
@@ -58,6 +59,9 @@ def client():
         mock_resp.usage_metadata = None
         mock_llm.invoke.return_value = mock_resp
         mock_registry.get_llm.return_value = mock_llm
+
+        # MLflow mock
+        mock_mlflow_manager.start_run.return_value.__enter__.return_value = MagicMock()
 
         from src.api.main import app
         from src.auth import database as db_mod

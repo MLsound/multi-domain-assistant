@@ -11,12 +11,22 @@ Endpoints:
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import time
+import sys
+
+# Windows console defaults to cp1252; MLflow writes 🏃 to stdout when ending a
+# run, which raises UnicodeEncodeError mid-request. Reconfigure stdio to UTF-8
+# at import time so background uvicorn workers don't crash on log emojis.
+for _stream_name in ("stdout", "stderr"):
+    _stream = getattr(sys, _stream_name, None)
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:  # noqa: BLE001
+            pass
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import List
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException
@@ -26,35 +36,36 @@ from sqlalchemy.orm import Session
 from src.api.schemas import HealthResponse, QueryRecordOut, QueryRequest, QueryResponse
 from src.auth.database import get_db, init_db
 from src.auth.deps import get_current_user
-from src.auth.models import QueryRecord, User
+from src.auth.models import User
 from src.auth.router import router as auth_router
 from src.config.mlflow_config import manager as mlflow_manager
 from src.config.settings import settings
+from src.domain.adapters import RagGraphEngine, SqlAlchemyQueryRepository
+from src.domain.exceptions import (
+    QueryProcessingError,
+    QueryTimeoutError,
+    QuotaExceededError,
+    RateLimitExceededError,
+)
+from src.domain.metrics import metrics_collector
+from src.domain.models import QueryCommand
+from src.domain.services import QueryService
 from src.security.rate_limiter import limiter
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# In-memory metrics counters (reset on process restart)
-# ---------------------------------------------------------------------------
-_metrics: Dict[str, Any] = {
-    "total_requests": 0,
-    "total_latency_ms": 0.0,
-    "errors": 0,
-    "cache_hits": 0,
-    "blocked_by_guard": 0,
-    "rate_limited": 0,
-    "pii_redacted": 0,
-}
-
+# Application service + RAG engine, wired once at startup (see lifespan).
+# The API layer holds only these references; all business logic lives in the
+# domain/service layer (src.domain).
 _rag_system = None
+_query_service: QueryService | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialise heavy resources once at startup."""
-    global _rag_system
+    """Initialise heavy resources once at startup and wire the service."""
+    global _rag_system, _query_service
 
     # CRITICAL: Set MLflow tracking URI BEFORE any @mlflow.trace decorated
     # methods are called. The decorators capture mlflow module state at call
@@ -70,6 +81,15 @@ async def lifespan(app: FastAPI):
 
     _rag_system = RAGGraph()
     logger.info("RAGGraph ready — provider=%s", _rag_system.provider_name)
+
+    # Compose the application service from concrete adapters (ports & adapters).
+    _query_service = QueryService(
+        rag_engine=RagGraphEngine(_rag_system),
+        rate_limiter=limiter,
+        tracker=mlflow_manager,
+        metrics=metrics_collector,
+    )
+    logger.info("QueryService ready")
     yield
     logger.info("Application shutdown")
 
@@ -122,127 +142,50 @@ async def query(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    global _metrics
+    """Thin transport adapter: build a command, delegate to the service, map
+    domain outcomes/errors back to HTTP. No business logic lives here."""
+    assert _query_service is not None, "QueryService not initialised"
 
-    # Rate limit (LLM04 mitigation)
-    allowed, retry_after = limiter.allow(user.id)
-    if not allowed:
-        _metrics["rate_limited"] += 1
+    command = QueryCommand(
+        user_id=user.id,
+        query=req.query,
+        session_id=req.session_id,
+        is_help_override=req.is_help_override,
+    )
+
+    try:
+        outcome = await _query_service.handle(
+            command,
+            quota_remaining_ok=user.queries_today < user.quota_queries_per_day,
+            repository=SqlAlchemyQueryRepository(db),
+        )
+    except RateLimitExceededError as exc:
         raise HTTPException(
             status_code=429,
-            detail=f"Rate limit exceeded. Retry in {retry_after}s.",
-            headers={"Retry-After": str(retry_after)},
-        )
+            detail=str(exc),
+            headers={"Retry-After": str(exc.retry_after)},
+        ) from exc
+    except QuotaExceededError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+    except QueryTimeoutError as exc:
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
+    except QueryProcessingError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    # Daily quota
-    if user.queries_today >= user.quota_queries_per_day:
-        raise HTTPException(status_code=429, detail="Daily query quota exceeded")
-
-    with mlflow_manager.start_run(
-        run_name=f"query-u{user.id}-{int(time.time())}",
-        tags={"user_id": str(user.id), "session_id": req.session_id or "default"},
-    ):
-        mlflow_manager.log_params({
-            "query_length": len(req.query),
-            "session_id": req.session_id or "default",
-            "is_help_override": req.is_help_override,
-        })
-
-        t0 = time.perf_counter()
-        try:
-            # Session id is namespaced by user so two users cannot share state.
-            scoped_session = f"u{user.id}:{req.session_id or 'default'}"
-
-            inputs = {
-                "query": req.query,
-                "session_id": scoped_session,
-                "is_help_section": req.is_help_override,
-                "history": [],
-                "retry_count": 0,
-                "from_cache": False,
-                "sanitized_query": "",
-                "category_probs": {},
-                "dominant_category": "",
-                "confidence": 0.0,
-                "retrieved_chunks": [],
-                "context_metadata": {},
-                "retrieval_time_ms": 0.0,
-                "sources_cited": [],
-                "response": "",
-                "token_count": 0,
-            }
-
-            result = await asyncio.wait_for(
-                _rag_system.app.ainvoke(inputs),
-                timeout=30.0,
-            )
-
-            latency_ms = (time.perf_counter() - t0) * 1000
-            _metrics["total_requests"] += 1
-            _metrics["total_latency_ms"] += latency_ms
-            if result.get("from_cache"):
-                _metrics["cache_hits"] += 1
-
-            guard_in = result.get("guard_input_result")
-            guard_out = result.get("guard_output_result")
-            blocked = not guard_in.is_safe if guard_in else False
-            if blocked:
-                _metrics["blocked_by_guard"] += 1
-            pii_in = guard_in.pii_detections if guard_in else []
-            pii_out = guard_out.pii_redacted_on_output if guard_out else []
-            if pii_in or pii_out:
-                _metrics["pii_redacted"] += 1
-
-            # Log response metrics to MLflow
-            mlflow_manager.log_metrics({
-                "latency_ms": round(latency_ms, 2),
-                "token_count": result.get("token_count", 0),
-                "confidence": result.get("confidence", 0.0),
-                "retry_count": result.get("retry_count", 0),
-                "retrieval_time_ms": result.get("retrieval_time_ms", 0.0),
-                "from_cache": 1 if result.get("from_cache") else 0,
-                "blocked_by_guard": 1 if blocked else 0,
-            })
-
-            # Per-user persistent log
-            user.queries_today += 1
-            rec = QueryRecord(
-                user_id=user.id,
-                session_id=scoped_session,
-                query=req.query[:1000],
-                response_preview=(result.get("response", "") or "")[:500],
-                dominant_category=result.get("dominant_category", ""),
-                confidence=result.get("confidence", 0.0),
-                latency_ms=latency_ms,
-                blocked_by_guard=blocked,
-            )
-            db.add(rec)
-            db.commit()
-
-            return QueryResponse(
-                response=result.get("response", ""),
-                sources_cited=result.get("sources_cited", []),
-                category_probs=result.get("category_probs", {}),
-                dominant_category=result.get("dominant_category", ""),
-                confidence=result.get("confidence", 0.0),
-                retrieval_time_ms=result.get("retrieval_time_ms", 0.0),
-                token_count=result.get("token_count", 0),
-                retry_count=result.get("retry_count", 0),
-                from_cache=result.get("from_cache", False),
-                injection_score=guard_in.injection_score if guard_in else 0.0,
-                injection_decision=guard_in.injection_decision if guard_in else "allow",
-                pii_redacted_count=len(pii_in) + len(pii_out),
-            )
-
-        except asyncio.TimeoutError:
-            _metrics["errors"] += 1
-            raise HTTPException(status_code=504, detail="Request timed out after 30 seconds")
-        except HTTPException:
-            raise
-        except Exception as exc:
-            _metrics["errors"] += 1
-            logger.exception("Unhandled error processing query")
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return QueryResponse(
+        response=outcome.response,
+        sources_cited=outcome.sources_cited,
+        category_probs=outcome.category_probs,
+        dominant_category=outcome.dominant_category,
+        confidence=outcome.confidence,
+        retrieval_time_ms=outcome.retrieval_time_ms,
+        token_count=outcome.token_count,
+        retry_count=outcome.retry_count,
+        from_cache=outcome.from_cache,
+        injection_score=outcome.injection_score,
+        injection_decision=outcome.injection_decision,
+        pii_redacted_count=outcome.pii_redacted_count,
+    )
 
 
 @app.get("/me/queries", response_model=List[QueryRecordOut])
@@ -252,13 +195,7 @@ def my_queries(
     db: Session = Depends(get_db),
 ):
     """Return the authenticated user's own query history."""
-    rows = (
-        db.query(QueryRecord)
-        .filter(QueryRecord.user_id == user.id)
-        .order_by(QueryRecord.created_at.desc())
-        .limit(min(limit, 200))
-        .all()
-    )
+    rows = SqlAlchemyQueryRepository(db).list_user_queries(user.id, limit)
     return [QueryRecordOut.model_validate(r) for r in rows]
 
 
@@ -286,22 +223,11 @@ async def health():
 
 @app.get("/metrics")
 async def metrics():
-    n = _metrics["total_requests"]
-    result = {
-        "total_requests": n,
-        "avg_latency_ms": round(_metrics["total_latency_ms"] / n, 2) if n else 0.0,
-        "error_rate": round(_metrics["errors"] / n, 4) if n else 0.0,
-        "cache_hit_rate": round(_metrics["cache_hits"] / n, 4) if n else 0.0,
-        "blocked_by_guard_rate": round(_metrics["blocked_by_guard"] / n, 4) if n else 0.0,
-        "rate_limited_count": _metrics["rate_limited"],
-        "pii_redacted_count": _metrics["pii_redacted"],
-        "total_errors": _metrics["errors"],
-        "total_cache_hits": _metrics["cache_hits"],
-    }
+    result = metrics_collector.snapshot()
     # Log aggregate metrics to MLflow (best-effort)
     try:
         mlflow_manager.log_metrics({
-            "api.total_requests": n,
+            "api.total_requests": result["total_requests"],
             "api.avg_latency_ms": result["avg_latency_ms"],
             "api.error_rate": result["error_rate"],
             "api.cache_hit_rate": result["cache_hit_rate"],
