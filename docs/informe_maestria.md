@@ -16,7 +16,7 @@ Este repositorio contiene el informe del proyecto final desarrollado para la mat
 - **Docentes:** 
   - Mg. Oksana Bokhonok — bokhonokok@gmail.com
   - Esp. Abraham Rodriguez — abraham.rodz17@gmail.com
-- **Versión del informe:** 2.0
+- **Versión del informe:** 2.1
 
 ---
 
@@ -30,7 +30,8 @@ Este repositorio contiene el informe del proyecto final desarrollado para la mat
 3. [Trabajo relacionado](#3-trabajo-relacionado)
 4. [Arquitectura del Sistema](#4-arquitectura-del-sistema)
    - [Topología del grafo (LangGraph)](#41-topología-del-grafo-langgraph)
-   - [Desglose de Agentes y Componentes](#42-desglose-de-agentes-y-componentes)
+   - [Arquitectura Hexagonal (Puertos y Adaptadores)](#42-arquitectura-hexagonal-puertos-y-adaptadores)
+   - [Desglose de Agentes y Componentes](#43-desglose-de-agentes-y-componentes)
 5. [RAG: Decisiones de diseño](#5-rag-decisiones-de-diseño)
 6. [Autenticación y aislamiento por usuario](#6-autenticación-y-aislamiento-por-usuario)
 7. [Seguridad](#7-seguridad)
@@ -78,6 +79,7 @@ El sistema debe cumplir los criterios de aprobación enviados por la cátedra el
 ### 2.3 Contribuciones
 
 - Un grafo de 8 agentes con comunicación dinámica vía bucle crítico (LangGraph como librería de orquestación, no como solución completa).
+- Una **Arquitectura Hexagonal** que extrae la lógica de negocio (`QueryService`) del controlador de la API, mejorando la testabilidad y el desacoplamiento.
 - Un *injection scorer* heurístico bilingüe (EN/ES) con peso por regla y score saturante, calibrado para *block-rate* ≥ 0.90 sobre nuestra suite red-team.
 - Un *PII redactor* propio con cobertura argentina (DNI, CUIT) además de patrones globales (email, IP, tarjeta, API key).
 - Un esquema de *signed prompt* (canary token) para detectar fugas de system prompt.

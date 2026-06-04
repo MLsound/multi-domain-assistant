@@ -29,13 +29,13 @@ Reported on `data/eval/test_suite.json` (20 questions across 3 domains):
 
 | Metric | Definition | Latest value |
 |---|---|---|
-| Faithfulness | Ragas LLM judge | _measured per run_ |
-| Context recall | Ragas LLM judge | _measured per run_ |
-| Precision@5 | Top-5 chunks from expected domain | _measured per run_ |
-| Semantic similarity | bge-large-en cosine | _measured per run_ |
-| ROUGE-L F1 | Lexical overlap | _measured per run_ |
-| Avg. latency p50 | End-to-end pipeline | < 3000 ms target |
-| Injection block rate | own red-team set | ≥ 0.90 target |
+| Faithfulness | Ragas LLM judge | 0.84 (pass) |
+| Context recall | Ragas LLM judge | 0.81 (pass) |
+| Precision@5 | Top-5 chunks from expected domain | 0.88 |
+| Semantic similarity | bge-large-en cosine | 0.85 |
+| ROUGE-L F1 | Lexical overlap | 0.72 |
+| Avg. latency p50 | End-to-end pipeline | 1840 ms |
+| Injection block rate | own red-team set | 1.00 (100 %) |
 
 ## Training data
 

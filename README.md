@@ -61,6 +61,7 @@ graph TD
 | Technical report (PDF) | `docs/informe_maestria.pdf` |
 | Presentation (PPTX) | `docs/presentation_FIUBA.pptx` |
 | Governance pack (NIST AI RMF) | `docs/governance/` |
+| Screenshots (API & Admin) | `docs/screenshots/` |
 | Constitutional principles | `src/alignment/constitution.yaml` |
 | Red-team test set | `tests/test_security.py` |
 
@@ -113,6 +114,7 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 
 ## Core Features
 
+- **Hexagonal Architecture**: Business logic is decoupled from the FastAPI transport layer. The core `QueryService` depends only on abstract ports (`RagEngine`, `RateLimiter`, etc.), allowing for high testability and infrastructure flexibility.
 - **MLP Router**: A PyTorch MLP trained on the document corpus classifies every query into three knowledge domains (Science, Software, User) using `all-MiniLM-L6-v2` sentence embeddings. Produces a probability distribution, not a hard label.
 - **Two-Stage Retriever-Ranker**: Weighted Qdrant vector search (`Score = P(c|q) × sim(q,d)`) followed by `cross-encoder/ms-marco-MiniLM-L6-v2` reranking. Retrieves 10 candidates, reranks, returns top 5.
 - **Critic Feedback Loop**: After synthesis the Critic Agent evaluates faithfulness via an LLM call. A rejected response triggers re-retrieval with a refined query. This is the system's dynamic inter-agent communication mechanism (up to `max_retries=2` loops before force-approval).
@@ -156,7 +158,7 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 │   │   ├── state.py             # GraphState TypedDict (20 fields)
 │   │   └── synthesis_agent.py   # Grounded LLM response generation
 │   ├── api/
-│   │   ├── main.py              # FastAPI app (POST /query, GET /health, GET /metrics)
+│   │   ├── main.py              # FastAPI transport adapter (Hexagonal)
 │   │   └── schemas.py           # Pydantic request/response models
 │   ├── cache/
 │   │   └── semantic_cache.py    # Qdrant-backed query cache
@@ -164,6 +166,11 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 │   │   ├── mlflow_config.py     # MLflowManager singleton — tracking lifecycle
 │   │   ├── model_registry.py    # Multi-provider LLM abstraction
 │   │   └── settings.py          # Pydantic BaseSettings — all configuration
+│   ├── domain/                  # Hexagonal core: services, ports & adapters
+│   │   ├── services.py          # QueryService orchestrator
+│   │   ├── ports.py             # Abstract repository/LLM/tracker interfaces
+│   │   ├── adapters.py          # Concrete bridge to infrastructure
+│   │   └── models.py            # Domain-specific QueryCommand/Outcome
 │   ├── evaluation/
 │   │   ├── eval_runner.py       # Full evaluation pipeline + MLflow tracking
 │   │   └── metrics.py           # timing_decorator, ROUGE-L, semantic similarity
@@ -187,6 +194,7 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 │   ├── test_api.py              # FastAPI endpoints (4 tests)
 │   ├── test_auth.py             # Auth — password, JWT, register/login/me (8 tests)
 │   ├── test_critic.py           # CriticAgent (3 tests)
+│   ├── test_domain_service.py   # Hexagonal service unit tests (NEW)
 │   ├── test_guard.py            # GuardAgent (6 tests)
 │   ├── test_integration.py      # End-to-end graph (3 tests)
 │   ├── test_model_registry.py   # Provider detection (4 tests)
@@ -194,6 +202,8 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 │   ├── test_security.py         # Red-team — injection, PII, canary (30 tests)
 │   └── test_synthesis.py        # SynthesisAgent (3 tests)
 ├── scripts/
+│   ├── _docs_server.py          # Local documentation/screenshot server
+│   ├── _user_flow_demo.py       # Terminal demo script
 │   ├── download_local_model.py  # Ollama setup helper
 │   └── run_evaluation.py        # Evaluation CLI wrapper
 ├── logs/                        # Runtime logs (gitignored)
