@@ -3,6 +3,32 @@
 # Knowledge Assistant: Core Framework & Validation Deployment
 > FIUBA · Maestría en IA · PNL III (2026) — Grupo 1: Sarmiento · Lloveras · Cuenca
 
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Deliverables (FIUBA PNL III)](#deliverables-fiuba-pnl-iii)
+- [Authentication](#authentication)
+- [Security (OWASP Top-10 LLM 2025)](#security-owasp-top-10-llm-2025)
+- [Core Features](#core-features)
+- [Stack](#stack)
+- [Project Structure](#project-structure)
+- [Setup & Installation](#setup--installation)
+    - [Prerequisites](#prerequisites)
+    - [1. Install dependencies](#1-install-dependencies)
+    - [2. Configure the environment](#2-configure-the-environment)
+    - [3a. Quick Start — Automatic (run.sh / run.ps1)](#3a-quick-start--automatic-runsh--runps1)
+    - [3b. Quick Start — Docker Compose (All services)](#3b-quick-start--docker-compose-all-services)
+    - [4. Manual Execution](#4-manual-execution)
+- [API Reference](#api-reference)
+    - [POST /query](#post-query)
+    - [GET /health](#get-health)
+    - [GET /metrics](#get-metrics)
+- [Evaluation](#evaluation)
+- [Observability & Tracing (MLflow)](#observability--tracing-mlflow)
+- [Testing](#testing)
+- [Optional Provider Installation](#optional-provider-installation)
+- [Configuration Reference](#configuration-reference)
+
 **Knowledge Assistant** is an inherently domain-agnostic, multi-category Agentic RAG framework designed to handle diverse document-consultation tasks within a single unified system. By leveraging a custom MLP-based semantic router and weighted hybrid retrieval, the core architecture seamlessly navigates and synthesizes information across completely disparate knowledge bases, from software documentation to scientific research.
 
 To validate the capabilities of this framework, this specific deployment is configured for the sustainable energy and smart building domain. While the system remains completely agnostic to the underlying data, this test instance focuses on the intersection of **Sustainable Energy**, **Photovoltaic (PV) Physics**, and **Home Energy Management Systems (HEMS)**. The full scope and technical parameters of this validation environment are documented [here](docs/CONTEXT.md).
