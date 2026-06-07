@@ -1,0 +1,1 @@
+Photovoltaic efficiency is directly proportional to solar intensity and wind speed while being inversely proportional to temperature, humidity, and dew point temperature. Increased wind speed provides a convective cooling effect that mitigates thermal degradation.

@@ -1,0 +1,1 @@
+MPPT controllers achieve 94-97% efficiency by tracking the maximum power point of solar panels hundreds of times per second. This delivers 15-30% more power to batteries than PWM controllers, especially in cold weather where panel voltage significantly exceeds battery voltage.

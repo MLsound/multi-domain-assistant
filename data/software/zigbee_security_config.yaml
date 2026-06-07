@@ -1,0 +1,8 @@
+zigbee_network:
+  permit_join: false # Prevents accidental pairing of unknown devices
+  channel: 11
+  pan_id: 0x1A2B
+  encryption:
+    type: AES-128
+    key:!secret zigbee_network_key
+  bridge: Zigbee2MQTT

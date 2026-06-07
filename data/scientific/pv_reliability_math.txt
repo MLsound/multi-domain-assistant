@@ -1,0 +1,1 @@
+Photovoltaic module lifespan is often modeled using the two-parameter Weibull distribution: (t) = \exp(-(t/\eta)^\beta)$. This allows for the estimation of expected operating life based on cumulative thermal and humidity stress.

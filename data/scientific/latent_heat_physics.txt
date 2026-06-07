@@ -1,0 +1,1 @@
+Latent heat transfer for air is calculated using enthalpy:  = m \cdot \Delta h$, where $ is the mass flow rate and $ is specific enthalpy. This represents the energy involved in moisture condensing on a cooling coil without a temperature change.

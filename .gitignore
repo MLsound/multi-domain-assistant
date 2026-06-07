@@ -1,2 +1,87 @@
+# Environment
 .env
+.env.local
+.env.test
+
+# Local env overrides (do not commit secrets)
+# Add other local env files as needed (e.g., .env.local, .env.test)
+
+# Python
 *.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Ruff cache
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editor / tooling caches
+.mypy_cache/
+pip-wheel-metadata/
+.python-version
+pip-delete-this-directory.txt
+
+# Poetry
+# poetry.lock is committed intentionally
+
+# Models (do not commit weights — use setup.py or ollama pull)
+models/
+*.pth
+*.gguf
+*.bin
+*.safetensors
+
+# Generated output (logs and reports contain runtime data)
+logs/
+reports/
+
+# ML / experiment artifacts
+mlruns/
+
+# HuggingFace cache
+.cache/
+
+# Test artefacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Auth DB (created at runtime, contains user credentials)
+data/auth.db
+data/auth.db-journal
+
+# Editor / Claude session
+.claude/
+
+# Misc
+node_modules/
+.ropeproject/
+*.sqlite3
+*.db
+
+# Ignore any other files that are not explicitly tracked
+.opencode 
+
+/varios
+/mlartifacts

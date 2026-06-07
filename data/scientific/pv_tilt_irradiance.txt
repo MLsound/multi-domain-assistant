@@ -1,0 +1,1 @@
+The irradiance incident on a cell ({cell}$) is calculated as {cell} = GHI \cdot \sin \alpha_S \cdot$, where $\alpha_S$ is sun elevation and $\beta_{res}$ is the cell tilt angle.

@@ -1,0 +1,5 @@
+The Google Nest SDM API utilize traits for HEMS orchestration:
+- sdm.devices.traits.Temperature: Reports ambientTemperatureCelsius.
+- sdm.devices.traits.Humidity: Reports ambientHumidityPercent.
+- sdm.devices.traits.ThermostatMode: Manages states (HEAT, COOL, OFF).
+Commands are executed via POST requests to the executeCommand endpoint.

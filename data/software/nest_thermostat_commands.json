@@ -1,0 +1,11 @@
+{
+  "endpoint": "https://smartdevicemanagement.googleapis.com/v1/enterprises/{project-id}/devices/{device-id}:executeCommand",
+  "command": "sdm.devices.commands.ThermostatMode.SetMode",
+  "available_modes":,
+  "request_body_example": {
+    "command": "sdm.devices.commands.ThermostatMode.SetMode",
+    "params": {
+      "mode": "COOL"
+    }
+  }
+}

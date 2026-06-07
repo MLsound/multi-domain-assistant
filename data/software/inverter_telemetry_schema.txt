@@ -1,0 +1,5 @@
+Fronius and SolarEdge inverters expose real-time production via open REST APIs and JSON objects. Key fields include:
+- power_ac: Current production in Watts (e.g., 4500W).
+- energy_day: Cumulative production for current day in Wh.
+- status_code: Inverter operating state (e.g., 7 = Running).
+- voltage_dc: Input voltage from DC strings to track MPPT performance.

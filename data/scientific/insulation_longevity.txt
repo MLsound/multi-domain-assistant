@@ -1,0 +1,1 @@
+The thermal properties of building envelope elements deteriorate over time due to natural aging. Thermal conductivity in glass wool insulation can rise by 12% over several decades, and moisture accumulation of 20% can decrease thermal resistance by at least 20%.

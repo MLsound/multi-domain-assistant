@@ -1,0 +1,4 @@
+The HEMS controller supports three primary operating modes:
+1. ZENKI/AI Mode: Dynamically schedules loads based on 24-hour weather and price forecasting.
+2. Auto Mode: Follows fixed user-defined Time-of-Use (ToU) schedules (e.g., "Run dishwasher at 10 PM").
+3. Expert Mode: Allows manual override and granular control of battery export thresholds and grid-tied discharge.
