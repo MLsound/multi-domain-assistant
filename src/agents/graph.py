@@ -77,6 +77,8 @@ def _make_cache_check_node(cache: SemanticCache):
 
     async def cache_check(state: GraphState) -> Dict[str, Any]:
         query = state.get("query", "")
+        # Note: SemanticCache.check is currently sync as it uses standard qdrant-client.
+        # It runs within the async event loop without blocking much if the response is fast.
         hit = cache.check(query)
         if hit:
             logger.info("Cache HIT — returning cached response")
@@ -143,6 +145,7 @@ def _make_guard_output_node(guard: GuardAgent, cache: SemanticCache):
         )
         if should_cache:
             try:
+                # cache.store is currently sync.
                 cache.store(
                     state.get("query", ""),
                     validated,

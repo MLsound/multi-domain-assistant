@@ -44,6 +44,9 @@ class FakeRagEngine:
             raise self._raises
         return self._result
 
+    async def ainvoke(self, inputs: dict) -> dict:
+        return self.invoke(inputs)
+
 
 class FakeTracker:
     def __init__(self) -> None:

@@ -33,6 +33,9 @@ class RagGraphEngine:
     def invoke(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         return self._graph.app.invoke(inputs)
 
+    async def ainvoke(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        return await self._graph.app.ainvoke(inputs)
+
 
 class SqlAlchemyQueryRepository:
     """Adapts a SQLAlchemy ``Session`` to the ``QueryRepository`` port.
