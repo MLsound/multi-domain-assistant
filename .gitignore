@@ -46,6 +46,7 @@ reports/
 
 # ML / experiment artifacts
 mlruns/
+mlartifacts/
 
 # HuggingFace cache
 .cache/
@@ -63,9 +64,17 @@ htmlcov/
 .idea/
 *.swp
 
-# OS
-.DS_Store
-Thumbs.db
+# OS Temporary files
+**/*~
+**/._ *
+**/.DS_Store
+**/Thumbs.db
+**/ehthumbs.db
+**/Desktop.ini
+**/.fuse_hidden*
+**/.directory
+**/.Trash-*
+**/.nfs*
 
 # Auth DB (created at runtime, contains user credentials)
 data/auth.db
@@ -84,4 +93,3 @@ node_modules/
 .opencode 
 
 /varios
-/mlartifacts
