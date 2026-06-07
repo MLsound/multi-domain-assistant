@@ -7,6 +7,7 @@ sources cited, and active provider on each turn.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from dotenv import load_dotenv
@@ -64,7 +65,8 @@ def chat() -> None:
             }
 
             print("\n--- Processing ---")
-            result = rag_system.app.invoke(inputs)
+            # Task: Use native async ainvoke.
+            result = asyncio.run(rag_system.app.ainvoke(inputs))
 
             print(f"\n[Provider] {rag_system.provider_name}")
             print(f"[Domain]   {result.get('dominant_category', '?')}  "

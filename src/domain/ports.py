@@ -27,7 +27,7 @@ class RateLimiter(Protocol):
 
 @runtime_checkable
 class RagEngine(Protocol):
-    """Synchronous entry point into the multi-agent RAG pipeline."""
+    """Entry point into the multi-agent RAG pipeline."""
 
     @property
     def provider_name(self) -> str:
@@ -35,6 +35,10 @@ class RagEngine(Protocol):
 
     def invoke(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Run the pipeline to completion and return the final state dict."""
+        ...
+
+    async def ainvoke(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Async version of invoke."""
         ...
 
 

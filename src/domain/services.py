@@ -126,8 +126,9 @@ class QueryService:
                 inputs = _build_rag_inputs(
                     command.query, scoped_session, command.is_help_override
                 )
+                # Task: Replace invoke wrapped in to_thread with native async ainvoke.
                 result = await asyncio.wait_for(
-                    asyncio.to_thread(self._rag.invoke, inputs),
+                    self._rag.ainvoke(inputs),
                     timeout=self._timeout_sec,
                 )
             except asyncio.TimeoutError as exc:
@@ -176,11 +177,22 @@ class QueryService:
         result: Dict[str, Any], latency_ms: float, scoped_session: str
     ) -> QueryOutcome:
         """Map the raw pipeline state into a domain outcome."""
-        guard_in = result.get("guard_input_result") or {}
-        guard_out = result.get("guard_output_result") or {}
-        blocked = not guard_in.get("is_safe", True)
-        pii_in = guard_in.get("pii_detections") or []
-        pii_out = guard_out.get("pii_redacted_on_output") or []
+        guard_in = result.get("guard_input_result")
+        guard_out = result.get("guard_output_result")
+
+        # Handle both dicts (from mocks) and Pydantic objects (from real graph)
+        def _get_val(obj, key, default):
+            if obj is None:
+                return default
+            if isinstance(obj, dict):
+                return obj.get(key, default)
+            return getattr(obj, key, default)
+
+        blocked = not _get_val(guard_in, "is_safe", True)
+        pii_in = _get_val(guard_in, "pii_detections", [])
+        pii_out = _get_val(guard_out, "pii_redacted_on_output", [])
+        inj_score = _get_val(guard_in, "injection_score", 0.0)
+        inj_decision = _get_val(guard_in, "injection_decision", "allow")
 
         return QueryOutcome(
             response=result.get("response", "") or "",
@@ -192,8 +204,8 @@ class QueryService:
             token_count=result.get("token_count", 0),
             retry_count=result.get("retry_count", 0),
             from_cache=result.get("from_cache", False),
-            injection_score=guard_in.get("injection_score", 0.0),
-            injection_decision=guard_in.get("injection_decision", "allow"),
+            injection_score=inj_score,
+            injection_decision=inj_decision,
             pii_redacted_count=len(pii_in) + len(pii_out),
             latency_ms=latency_ms,
             blocked_by_guard=blocked,
