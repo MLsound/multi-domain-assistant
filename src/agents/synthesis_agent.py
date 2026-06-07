@@ -128,11 +128,12 @@ class SynthesisAgent:
         ]
 
         @retry(
-            wait=wait_exponential(min=1, max=30),
-            stop=stop_after_attempt(3),
+            wait=wait_exponential(min=2, max=60),
+            stop=stop_after_attempt(5),
             reraise=True,
         )
         async def _invoke():
+            # Task: Replace invoke wrapped in to_thread with native async ainvoke.
             return await llm.ainvoke(messages)
 
         try:
