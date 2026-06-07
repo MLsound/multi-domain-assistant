@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict
 
+import src.config.mlflow_setup
 import mlflow
 
 from src.config.settings import settings

@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
+import src.config.mlflow_setup
 import mlflow
 
 from src.agents.state import ActionResult

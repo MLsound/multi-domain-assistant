@@ -12,6 +12,8 @@ import logging
 from contextlib import contextmanager
 from typing import Any, Generator
 
+import os
+import src.config.mlflow_setup
 import mlflow
 
 from src.config.settings import settings
@@ -35,13 +37,15 @@ class MLflowManager:
         if self._initialised:
             return
 
-        mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+        # Prefer tracking URI from environment if set (by mlflow_setup)
+        tracking_uri = os.getenv("MLFLOW_TRACKING_URI", settings.mlflow_tracking_uri)
+        mlflow.set_tracking_uri(tracking_uri)
         mlflow.set_experiment(settings.mlflow_experiment_name)
 
         self._initialised = True
         logger.info(
             "MLflow initialised — uri=%s experiment=%s",
-            settings.mlflow_tracking_uri,
+            tracking_uri,
             settings.mlflow_experiment_name,
         )
 

@@ -47,6 +47,7 @@ reports/
 # ML / experiment artifacts
 mlruns/
 mlartifacts/
+mlflow_data/
 
 # HuggingFace cache
 .cache/
