@@ -183,29 +183,34 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 │   │   ├── router_agent.py      # MLP domain classifier
 │   │   ├── state.py             # GraphState TypedDict (20 fields)
 │   │   └── synthesis_agent.py   # Grounded LLM response generation
+│   ├── alignment/               # LLM constitutional principles & loader
 │   ├── api/
 │   │   ├── main.py              # FastAPI transport adapter (Hexagonal)
 │   │   └── schemas.py           # Pydantic request/response models
+│   ├── auth/                    # JWT registration/login & per-user isolation
 │   ├── cache/
 │   │   └── semantic_cache.py    # Qdrant-backed query cache
 │   ├── config/
 │   │   ├── mlflow_config.py     # MLflowManager singleton — tracking lifecycle
+│   │   ├── mlflow_setup.py      # Centralised MLflow env configuration
 │   │   ├── model_registry.py    # Multi-provider LLM abstraction
 │   │   └── settings.py          # Pydantic BaseSettings — all configuration
 │   ├── domain/                  # Hexagonal core: services, ports & adapters
 │   │   ├── services.py          # QueryService orchestrator
 │   │   ├── ports.py             # Abstract repository/LLM/tracker interfaces
 │   │   ├── adapters.py          # Concrete bridge to infrastructure
-│   │   └── models.py            # Domain-specific QueryCommand/Outcome
+│   │   ├── models.py            # Domain-specific QueryCommand/Outcome
+│   │   └── exceptions.py        # Domain-specific error hierarchy
 │   ├── evaluation/
 │   │   ├── eval_runner.py       # Full evaluation pipeline + MLflow tracking
-│   │   └── metrics.py           # timing_decorator, ROUGE-L, semantic similarity
+│   │   └── metrics.py           # ROUGE-L, semantic similarity, etc.
 │   ├── memory/
 │   │   └── session_store.py     # In-memory session history with TTL
 │   ├── retrieval/
 │   │   └── weighted_retriever.py # Qdrant search + cross-encoder reranking
 │   ├── router/
 │   │   └── mlp_router.py        # PyTorch MLP + sentence-transformer embedder
+│   ├── security/                # OWASP protection (limiter, redactor, injection)
 │   └── tools/
 │       └── weather_mcp.py       # Mock environmental data MCP tool
 ├── data/
@@ -214,30 +219,33 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 │   ├── scientific/              # 13 PV physics and building thermodynamics files
 │   ├── software/                # 15 HEMS, EV charger, thermostat API files
 │   └── user/                    # 7 safety manuals and scheduling guides
-├── tests/
-│   ├── smoke_test.py            # Legacy two-query smoke test
+├── tests/                       # Totalling 83 tests
+│   ├── smoke_test.py            # Async-ready graph smoke test
 │   ├── test_action.py           # ActionAgent (3 tests)
 │   ├── test_api.py              # FastAPI endpoints (4 tests)
-│   ├── test_auth.py             # Auth — password, JWT, register/login/me (8 tests)
+│   ├── test_auth.py             # Auth — registration, JWT, per-user (8 tests)
 │   ├── test_critic.py           # CriticAgent (3 tests)
-│   ├── test_domain_service.py   # Hexagonal service unit tests (NEW)
+│   ├── test_domain_service.py   # Hexagonal service unit tests
 │   ├── test_guard.py            # GuardAgent (6 tests)
 │   ├── test_integration.py      # End-to-end graph (3 tests)
+│   ├── test_metrics.py          # Tool-call success & async metric scorers
 │   ├── test_model_registry.py   # Provider detection (4 tests)
 │   ├── test_router.py           # MLPRouter (6 tests)
 │   ├── test_security.py         # Red-team — injection, PII, canary (30 tests)
 │   └── test_synthesis.py        # SynthesisAgent (3 tests)
 ├── scripts/
 │   ├── _docs_server.py          # Local documentation/screenshot server
-│   ├── _user_flow_demo.py       # Terminal demo script
-│   ├── download_local_model.py  # Ollama setup helper
+│   ├── benchmark_api.py         # Load testing script
+│   ├── generate_presentation.py # PPTX generator for FIUBA deliverables
 │   └── run_evaluation.py        # Evaluation CLI wrapper
 ├── logs/                        # Runtime logs (gitignored)
 ├── reports/                     # Evaluation output (gitignored)
 ├── models/                      # Trained MLP weights (gitignored)
+├── mlflow_data/                 # Local MLflow tracking data (gitignored)
 ├── chat.py                      # Interactive CLI interface
+├── evaluate.py                  # Evaluation entrypoint
 ├── setup.py                     # Bootstrap: MLP training + Qdrant indexing
-├── run.sh                       # All-in-one setup and launch script
+├── run.sh / run.ps1             # Multi-platform setup and launch scripts
 ├── Dockerfile                   # Multi-stage CPU-only build (~1.5 GB)
 ├── docker-compose.yml           # Qdrant + MLflow + API services (dev: Qdrant + MLflow only)
 ├── .env.example                 # Environment variable template
@@ -499,18 +507,18 @@ Uses the same LLM provider as the main pipeline (set via `.env`) — no `GOOGLE_
 |--------|--------|-------------|
 | `faithfulness` | Ragas (LLM) | Fraction of response claims supported by retrieved context |
 | `context_recall` | Ragas (LLM) | Fraction of ground-truth statements retrievable from context |
-| `context_precision` | Ragas (LLM, async) | Whether relevant chunks are ranked higher than irrelevant ones *(NEW)* |
-| `answer_relevancy` | Ragas (LLM, async) | Whether the generated answer addresses the question *(NEW)* |
+| `context_precision` | Ragas (LLM, async) | Whether relevant chunks are ranked higher than irrelevant ones  |
+| `answer_relevancy` | Ragas (LLM, async) | Whether the generated answer addresses the question  |
 | `precision_at_k` | Chunk category match | Fraction of top-5 chunks from the expected domain |
 | `retrieval_time_ms` | Timer | Qdrant search + reranking latency |
 | `total_latency_ms` | Timer | Full pipeline latency per question |
 | `token_count` | LLM metadata | Total tokens consumed by the LLM |
 | `semantic_similarity` | `bge-large-en-v1.5` cosine | Cosine similarity between generated and reference answer |
 | `rouge_l` | `rouge-score` | ROUGE-L F1 between generated and reference answer |
-| `tool_router_success` | Deterministic | Whether the MLP classifier produced a dominant category *(NEW)* |
-| `tool_retrieval_success` | Deterministic | Whether retrieval returned non-empty chunks with positive latency *(NEW)* |
-| `tool_critic_success` | Deterministic | Whether the critic approved on first pass (score=1), required retries (0.5), or no data (0) *(NEW)* |
-| `tool_action_success` | Deterministic | Whether the audit log write succeeded *(NEW)* |
+| `tool_router_success` | Deterministic | Whether the MLP classifier produced a dominant category  |
+| `tool_retrieval_success` | Deterministic | Whether retrieval returned non-empty chunks with positive latency  |
+| `tool_critic_success` | Deterministic | Whether the critic approved on first pass (score=1), required retries (0.5), or no data (0)  |
+| `tool_action_success` | Deterministic | Whether the audit log write succeeded  |
 
 The four `tool_*_success` metrics are deterministic (no LLM required) and measure per-agent tool-call reliability without additional cost.
 
