@@ -160,6 +160,7 @@ Ocho agentes, una comunicación dinámica clara: el *CriticAgent* le dice al *Re
 Cada componente vive en su propio archivo bajo `src/agents/` y tiene tests unitarios.
 
 ---
+<br><br><br><br>
 
 ## 5. RAG: Decisiones de diseño
 
@@ -339,7 +340,3 @@ Cumplimos los siete criterios de la consigna y dimos un paso adicional: integram
 - OWASP GenAI Security Project. *Top 10 for LLM Applications*. 2025.
 - European Parliament & Council. *Regulation on Artificial Intelligence (AI Act)*. 2024.
 - Material de cátedra: *Procesamiento de Lenguaje Natural III — Clase 2: Seguridad, ética y alineación*, FIUBA, 2026.
-
-<br>
-
-![""](assets/logoFooter.png)
