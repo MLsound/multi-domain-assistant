@@ -581,17 +581,24 @@ Execute the core user flow simulation in interactive CLI mode. This script mimic
 ```bash
 poetry run python -m src.utils.user_flow_demo http://127.0.0.1:8000 docs/screenshots/user_flow.html --cli
 ```
-
-3. **Alternative: Direct Execution and Automated Review**
-Run the simulation directly and immediately open the resulting HTML report to inspect the simulated user path and captured snapshots:
+3. Open the resulting HTML report to inspect the simulated user path and captured snapshots:
 ```bash
-# Execute the user flow simulation
-poetry run python -m src.utils.user_flow_demo http://127.0.0.1:8000 docs/screenshots/user_flow.html --cli
-
 # Visualize results in your default browser
 # (Use 'start' on Windows, 'xdg-open' on Linux)
 open docs/screenshots/user_flow.html
 ```
+
+### Simulated Knowledge Assistant Chat Demo (User POV)
+Demonstrates the system's end-to-end capabilities from the user's perspective.
+```bash
+poetry run python scripts/chat_demo_simulation.py http://127.0.0.1:8000
+```
+**User flow:**
+  1. User 1 Registration & Login.
+  2. User 1 Benign RAG Query (showing streaming-like typing & citation list).
+  3. User 1 Prompt Injection Attack (showing guardrail blocking & HTTP 4xx error).
+  4. User 2 Login & Query (demonstrating query history isolation).
+  5. System Metrics Retrieval.
 ---
 # Optional Provider Installation
 The five alternative LLM providers are installed as Poetry extras to avoid bloating the default environment.
