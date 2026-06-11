@@ -33,15 +33,13 @@
 
 To validate the capabilities of this framework, this specific deployment is configured for the sustainable energy and smart building domain. While the system remains completely agnostic to the underlying data, this test instance focuses on the intersection of **Sustainable Energy**, **Photovoltaic (PV) Physics**, and **Home Energy Management Systems (HEMS)**. The full scope and technical parameters of this validation environment are documented [here](docs/CONTEXT.md).
 
-**System Architecture & Production Features**
+**System Architecture & Production Features:**
+- **Eight-Agent LangGraph Pipeline:** Natural-language queries are dynamically routed through a structured pipeline containing a semantic cache, input guard, MLP classifier, retriever-ranker, synthesizer, faithfulness critic, output guard, and an automated action agent.
+- **Production-Grade Production Interface:** The system exposes a FastAPI REST interface built with **JWT-based registration / login**, strict **per-user isolation** for data security, and **MLflow observability** for continuous evaluation and pipeline tracking.
 
-* **Eight-Agent LangGraph Pipeline:** Natural-language queries are dynamically routed through a structured pipeline containing a semantic cache, input guard, MLP classifier, retriever-ranker, synthesizer, faithfulness critic, output guard, and an automated action agent.
-* **Production-Grade Production Interface:** The system exposes a FastAPI REST interface built with **JWT-based registration / login**, strict **per-user isolation** for data security, and **MLflow observability** for continuous evaluation and pipeline tracking.
-
-> ⚠️ **Course constraint honoured:** every flow-critical component (auth, guardrails, alignment) is hand-rolled — no auth-as-a-service framework, no plug-and-play guardrails suite. See full [report](docs/informe_maestria.md) for the rationale (in spanish).
+> **Course constraint honoured:** every flow-critical component (auth, guardrails, alignment) is hand-rolled — no auth-as-a-service framework, no plug-and-play guardrails suite. See full [report](docs/informe_maestria.md) for the rationale (in spanish).
 
 ## Architecture
-
 ```mermaid
 graph TD
     User([User Query]) -->|POST /query| API[FastAPI Gateway]
@@ -81,9 +79,8 @@ graph TD
 ```
 
 ## Deliverables (FIUBA PNL III)
-
 | Artifact | Path |
-|---|---|
+|----------|------|
 | Technical report (PDF) | `docs/informe_maestria.pdf` |
 | Presentation (PPTX) | `docs/presentation_FIUBA.pptx` |
 | Governance pack (NIST AI RMF) | `docs/governance/` |
@@ -92,16 +89,13 @@ graph TD
 | Red-team test set | `tests/test_security.py` |
 
 Regenerate the PPTX or PDF after a code change:
-
 ```bash
 python scripts/generate_presentation.py     # → docs/presentation_FIUBA.pptx
 python scripts/generate_report_pdf.py       # → docs/informe_maestria.pdf
 ```
 
 ## Authentication
-
 Endpoints (own implementation, `src/auth/`):
-
 ```bash
 # 1. Register
 curl -X POST http://localhost:8000/auth/register \
@@ -126,9 +120,8 @@ Set `AUTH_JWT_SECRET` in `.env` (generate with `python -c "import secrets; print
 The user/quota DB defaults to `sqlite:///data/auth.db`; switch to PostgreSQL via `AUTH_DATABASE_URL`.
 
 ## Security (OWASP Top-10 LLM 2025)
-
 | Code | Risk | Control |
-|---|---|---|
+|------|------|---------|
 | LLM01 | Prompt injection | `src/security/injection_scorer.py` (heuristic, weighted, EN+ES) + canary token |
 | LLM02 | Insecure output | output PII scrub + leak markers |
 | LLM04 | DoS | sliding-window limiter + per-user daily quota |
@@ -154,7 +147,7 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 ## Stack
 
 | Component | Technology |
-|-----------|-----------|
+|-----------|------------|
 | Orchestration | LangGraph `StateGraph` with conditional edges and retry loop |
 | Vector database | Qdrant (Docker) |
 | Router embeddings | `sentence-transformers/all-MiniLM-L6-v2` |
@@ -170,7 +163,6 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 | Runtime | Python 3.11+, Poetry |
 
 ## Project Structure
-
 ```text
 .
 ├── src/
@@ -211,8 +203,9 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 │   ├── router/
 │   │   └── mlp_router.py        # PyTorch MLP + sentence-transformer embedder
 │   ├── security/                # OWASP protection (limiter, redactor, injection)
-│   └── tools/
-│       └── weather_mcp.py       # Mock environmental data MCP tool
+│   ├── tools/
+│   │   └── weather_mcp.py       # Mock environmental data MCP tool
+│   └── utils/                   # Dev/utility scripts: docs_server.py, user_flow_demo.py
 ├── data/
 │   ├── eval/
 │   │   └── test_suite.json      # 20-question evaluation dataset
@@ -234,8 +227,8 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 │   ├── test_security.py         # Red-team — injection, PII, canary (30 tests)
 │   └── test_synthesis.py        # SynthesisAgent (3 tests)
 ├── scripts/
-│   ├── _docs_server.py          # Local documentation/screenshot server
 │   ├── benchmark_api.py         # Load testing script
+│   ├── chat_demo_simulation.py  # User-POV chat demo simulation
 │   ├── generate_presentation.py # PPTX generator for FIUBA deliverables
 │   └── run_evaluation.py        # Evaluation CLI wrapper
 ├── logs/                        # Runtime logs (gitignored)
@@ -251,25 +244,21 @@ The red-team suite is in `tests/test_security.py` and asserts `injection_block_r
 ├── .env.example                 # Environment variable template
 └── pyproject.toml               # Poetry dependencies + dev tools
 ```
+---
+# 1. Setup & Installation
 
-## Setup & Installation
-
-### Prerequisites
-
+**Prerequisites**
 - Python 3.11 or 3.12
 - [Poetry](https://python-poetry.org/docs/) — dependency management
 - [Docker](https://docs.docker.com/get-docker/) — runs Qdrant vector database and MLflow tracking server
 
-### 1. Install dependencies
-
+## 1. Install dependencies
 ```bash
 git clone <repo-url>
 cd multi-domain-assistant
 poetry install
 ```
-
 To install optional LLM provider packages alongside the core dependencies:
-
 ```bash
 # Install one provider: gemini, claude, groq, openrouter, kimi, ollama
 poetry install --extras groq
@@ -278,12 +267,10 @@ poetry install --extras groq
 poetry install --extras all-providers
 ```
 
-### 2. Configure the environment
-
+## 2. Configure the environment
 ```bash
 cp .env.example .env
 ```
-
 Open `.env` and set at least one of the following API keys. The system checks them in priority order and selects the first available provider automatically.
 
 ```bash
@@ -307,36 +294,30 @@ MOONSHOT_API_KEY=your_key_here
 # Then: ollama pull phi3:mini
 LLM_PROVIDER=ollama
 ```
-
 To force a specific provider regardless of which keys are present:
 
 ```bash
 LLM_PROVIDER=groq   # valid values: gemini | claude | groq | openrouter | kimi | ollama
 ```
-
 The active provider is always printed to stdout at startup:
 
 ```
 [ModelRegistry] Active provider: Groq (llama-3.1-8b-instant / llama-3.3-70b-versatile)
 ```
-
+## 3. Containers build
 ### 3a. Quick Start — Automatic (`run.sh` / `run.ps1`)
-
 The script checks prerequisites, starts Qdrant and MLflow via Docker Compose, indexes documents, trains the MLP router, runs the test suite, starts the FastAPI server, and prints a usage summary.
 
 **Windows (PowerShell):**
 ```powershell
 .\run.ps1
 ```
-
 **Linux / WSL (Bash):**
 ```bash
 chmod +x run.sh
 ./run.sh
 ```
-
 ### 3b. Quick Start — Docker Compose (All services)
-
 Runs Qdrant, MLflow, and the API application in containers.
 
 ```bash
@@ -346,21 +327,18 @@ docker compose up --build
 # In a separate terminal: train MLP and index documents into the containerised Qdrant
 QDRANT_URL=http://localhost:6333 poetry run python setup.py
 ```
-
 Once running, three services are available:
-- **API** — `http://localhost:8000`
-- **Qdrant Dashboard** — `http://localhost:6333/dashboard`
-- **MLflow UI** — `http://localhost:5000`
-
+  - **API** — `http://localhost:8000`
+  - **Qdrant Dashboard** — `http://localhost:6333/dashboard`
+  - **MLflow UI** — `http://localhost:5000`
+  
 To stop all services:
 ```bash
 docker compose stop
 ```
 
-### 4. Manual Execution
-
-#### A. Start Qdrant + MLflow
-
+## 4. Manual Execution (Alternative)
+### A. Start Qdrant + MLflow
 ```bash
 # Using Docker Compose (recommended)
 docker compose up -d qdrant mlflow
@@ -374,37 +352,27 @@ docker run -d -p 5000:5000 --name mlflow_server \
   --backend-store-uri sqlite:////mlflow/mlflow.db \
   --default-artifact-root /mlflow/artifacts
 ```
-
 The MLflow UI is available at `http://localhost:5000`. All agent traces, evaluation runs, and API query metrics are automatically logged here.
-
-#### B. Index documents and train the MLP router
-
+### B. Index documents and train the MLP router
 ```bash
 poetry run python setup.py
 ```
-
 This reads all files from `data/scientific/`, `data/software/`, and `data/user/`, splits them into 512-character overlapping chunks, trains the MLP classifier for 50 epochs, and indexes the chunks into Qdrant. Expected runtime: 3–8 minutes depending on hardware.
-
-#### C. Start the API server
-
+### C. Start the API server
 ```bash
 poetry run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-
-#### D. Interactive CLI
-
+### D. Interactive CLI
 ```bash
 poetry run python chat.py
 ```
-
-## API Reference
+---
+# 2. API Reference
 
 ### `POST /query`
-
 Submit a natural-language query and receive a grounded response.
 
-**Request body:**
-
+**Reques t body:**
 ```json
 {
   "query": "What are the NFPA 855 clearance requirements for BESS?",
@@ -412,7 +380,6 @@ Submit a natural-language query and receive a grounded response.
   "is_help_override": false
 }
 ```
-
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `query` | string | Yes | Query text (1–2000 characters) |
@@ -420,7 +387,6 @@ Submit a natural-language query and receive a grounded response.
 | `is_help_override` | bool | No | Forces Software 85% / Science 15% domain weighting |
 
 **Response body:**
-
 ```json
 {
   "response": "A minimum 3-foot (36-inch) clearance from combustibles must be maintained.",
@@ -434,9 +400,7 @@ Submit a natural-language query and receive a grounded response.
   "from_cache": false
 }
 ```
-
 **Example:**
-
 ```bash
 curl -s -X POST http://localhost:8000/query \
   -H "Content-Type: application/json" \
@@ -445,13 +409,10 @@ curl -s -X POST http://localhost:8000/query \
 ```
 
 ### `GET /health`
-
 Returns Qdrant connectivity status and active LLM provider.
-
 ```bash
 curl http://localhost:8000/health
 ```
-
 ```json
 {
   "status": "ok",
@@ -459,17 +420,13 @@ curl http://localhost:8000/health
   "active_provider": "groq"
 }
 ```
-
 `status` is `"ok"` when Qdrant is reachable, `"degraded"` otherwise. The API continues to serve cached responses when degraded.
 
 ### `GET /metrics`
-
 Returns aggregated request metrics since the last process start.
-
 ```bash
 curl http://localhost:8000/metrics
 ```
-
 ```json
 {
   "total_requests": 24,
@@ -480,10 +437,10 @@ curl http://localhost:8000/metrics
   "total_cache_hits": 3
 }
 ```
-
 Interactive API documentation is available at `http://localhost:8000/docs` (Swagger UI) while the server is running.
 
-## Evaluation
+---
+# 3. Evaluation
 
 The evaluation suite runs 20 test questions across all three knowledge domains and computes eight metrics per question.
 
@@ -507,22 +464,23 @@ Uses the same LLM provider as the main pipeline (set via `.env`) — no `GOOGLE_
 |--------|--------|-------------|
 | `faithfulness` | Ragas (LLM) | Fraction of response claims supported by retrieved context |
 | `context_recall` | Ragas (LLM) | Fraction of ground-truth statements retrievable from context |
-| `context_precision` | Ragas (LLM, async) | Whether relevant chunks are ranked higher than irrelevant ones  |
-| `answer_relevancy` | Ragas (LLM, async) | Whether the generated answer addresses the question  |
+| `context_precision` | Ragas (LLM, async) | Whether relevant chunks are ranked higher than irrelevant ones |
+| `answer_relevancy` | Ragas (LLM, async) | Whether the generated answer addresses the question |
 | `precision_at_k` | Chunk category match | Fraction of top-5 chunks from the expected domain |
 | `retrieval_time_ms` | Timer | Qdrant search + reranking latency |
 | `total_latency_ms` | Timer | Full pipeline latency per question |
 | `token_count` | LLM metadata | Total tokens consumed by the LLM |
 | `semantic_similarity` | `bge-large-en-v1.5` cosine | Cosine similarity between generated and reference answer |
 | `rouge_l` | `rouge-score` | ROUGE-L F1 between generated and reference answer |
-| `tool_router_success` | Deterministic | Whether the MLP classifier produced a dominant category  |
-| `tool_retrieval_success` | Deterministic | Whether retrieval returned non-empty chunks with positive latency  |
-| `tool_critic_success` | Deterministic | Whether the critic approved on first pass (score=1), required retries (0.5), or no data (0)  |
-| `tool_action_success` | Deterministic | Whether the audit log write succeeded  |
+| `tool_router_success` | Deterministic | Whether the MLP classifier produced a dominant category |
+| `tool_retrieval_success` | Deterministic | Whether retrieval returned non-empty chunks with positive latency |
+| `tool_critic_success` | Deterministic | Whether the critic approved on first pass (score=1), required retries (0.5), or no data (0) |
+| `tool_action_success` | Deterministic | Whether the audit log write succeeded |
 
 The four `tool_*_success` metrics are deterministic (no LLM required) and measure per-agent tool-call reliability without additional cost.
 
-## Observability & Tracing (MLflow)
+---
+# 4. Observability & Tracing (MLflow)
 
 The system uses [MLflow](https://mlflow.org/) for end-to-end observability:
 - **Agent-level tracing** — Every agent execution is traced with `@mlflow.trace`, capturing inputs, outputs, latency, and errors as nested spans.
@@ -546,7 +504,6 @@ docker compose up mlflow
 The Docker Compose configuration uses `sqlite:////mlflow/mlflow.db` (absolute path) with a named volume `mlflow_data` for persistence.
 
 ### Troubleshooting
-
 **MLflow UI shows no traces:** Ensure `mlflow_manager.initialise()` runs before any `@mlflow.trace` decorated methods. The API lifespan handler handles this automatically. If traces still don't appear, check that `MLFLOW_TRACKING_URI` in `.env` matches the running server address.
 
 **Container name conflicts:** If you previously ran containers via `docker run`, remove them before using `docker compose`:
@@ -555,7 +512,6 @@ docker rm -f mlflow_server qdrant_rag
 ```
 
 ### Viewing Traces
-
 Open `http://localhost:5000` in your browser. You will see:
 
 1. **Experiments** — The `knowledge-assistant` experiment contains all runs.
@@ -566,7 +522,6 @@ Open `http://localhost:5000` in your browser. You will see:
    - **Artifacts** (evaluation_results.json)
 
 ### Trace Hierarchy
-
 ```
 root span: "rag_graph" (per /query request)
   ├── cache_check        → cache_hit (bool), query (str)
@@ -586,70 +541,8 @@ root span: "rag_graph" (per /query request)
 | `MLFLOW_TRACKING_URI` | `http://localhost:5000` | MLflow server URL |
 | `MLFLOW_EXPERIMENT_NAME` | `knowledge-assistant` | Experiment name for all runs |
 
-## Observability & Tracing (MLflow)
-
-The system uses [MLflow](https://mlflow.org/) for end-to-end observability:
-- **Agent-level tracing** — Every agent execution is traced with `@mlflow.trace`, capturing inputs, outputs, latency, and errors as nested spans.
-- **Evaluation tracking** — Each `run_evaluation()` call creates an MLflow run with parameters, per-question metrics, aggregate scores, and the results JSON as an artifact.
-- **Experiment comparison** — Compare evaluation runs side-by-side in the MLflow UI to track improvements across prompt changes, model switches, or threshold tuning.
-
-### Starting the MLflow Server
-
-```bash
-# Option 1: Direct launch (SQLite backend, development)
-poetry run mlflow server \
-  --host 127.0.0.1 \
-  --port 5000 \
-  --backend-store-uri sqlite:////$(pwd)/mlflow.db
-
-# Option 2: Docker Compose (recommended for team access)
-docker compose up mlflow
-```
-
-The Docker Compose configuration uses `sqlite:////mlflow/mlflow.db` (absolute path) with a named volume `mlflow_data` for persistence.
-
-### Troubleshooting
-
-**MLflow UI shows no traces:** Ensure `mlflow_manager.initialise()` runs before any `@mlflow.trace` decorated methods. The API lifespan handler handles this automatically. If traces still don't appear, check that `MLFLOW_TRACKING_URI` in `.env` matches the running server address.
-
-**Container name conflicts:** If you previously ran containers via `docker run`, remove them before using `docker compose`:
-```bash
-docker rm -f mlflow_server qdrant_rag
-```
-
-### Viewing Traces
-
-Open `http://localhost:5000` in your browser. You will see:
-
-1. **Experiments** — The `knowledge-assistant` experiment contains all runs.
-2. **Runs** — Each evaluation or API request appears as a run with:
-   - **Parameters** (provider, thresholds, n_questions)
-   - **Metrics** (faithfulness, context_recall, latency, etc.)
-   - **Traces** (nested span tree showing the full agent execution path)
-   - **Artifacts** (evaluation_results.json)
-
-### Trace Hierarchy
-
-```
-root span: "rag_graph" (per /query request)
-  ├── cache_check        → cache_hit (bool), query (str)
-  ├── guard_input        → is_safe (bool), injection_score (float)
-  ├── router             → dominant_category (str), confidence (float)
-  ├── retrieval          → chunk_count (int), retrieval_time_ms (float)
-  ├── synthesis          → response (str), token_count (int), provider (str)
-  ├── critic             → verdict (str), score (float), retry_count (int)
-  ├── guard_output       → pii_redacted (int), canary_leak (bool)
-  └── action             → audit_success (bool), webhook_success (bool)
-```
-
-### Configuration
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MLFLOW_TRACKING_URI` | `http://localhost:5000` | MLflow server URL |
-| `MLFLOW_EXPERIMENT_NAME` | `knowledge-assistant` | Experiment name for all runs |
-
-## Testing
+---
+# 5. Testing
 
 ```bash
 # Run all 78 tests
@@ -660,7 +553,6 @@ poetry run pytest tests/ -v \
   --ignore=tests/test_api.py \
   --ignore=tests/test_integration.py
 ```
-
 | Test file | Coverage | Tests |
 |-----------|----------|-------|
 | `test_router.py` | `MLPRouter.route()` — structure, probabilities, edge cases | 6 |
@@ -675,8 +567,32 @@ poetry run pytest tests/ -v \
 | `test_security.py` | Red-team — injection scoring, PII redaction, canary tokens | 30 |
 | `test_metrics.py` | Tool-call success flags, robust async scorer with retry | 11 |
 
-## Optional Provider Installation
+## How to run the CLI Simulation
 
+1. **Start your FastAPI Server**
+Launch the backend server in a separate terminal window to handle incoming simulation requests:
+```bash
+poetry run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+```
+
+2. **Run the Simulation Script**
+Execute the core user flow simulation in interactive CLI mode. This script mimics user behavior, sends requests to the local server, and generates a visual walkthrough document:
+```bash
+poetry run python -m src.utils.user_flow_demo http://127.0.0.1:8000 docs/screenshots/user_flow.html --cli
+```
+
+3. **Alternative: Direct Execution and Automated Review**
+Run the simulation directly and immediately open the resulting HTML report to inspect the simulated user path and captured snapshots:
+```bash
+# Execute the user flow simulation
+poetry run python -m src.utils.user_flow_demo http://127.0.0.1:8000 docs/screenshots/user_flow.html --cli
+
+# Visualize results in your default browser
+# (Use 'start' on Windows, 'xdg-open' on Linux)
+open docs/screenshots/user_flow.html
+```
+---
+# Optional Provider Installation
 The five alternative LLM providers are installed as Poetry extras to avoid bloating the default environment.
 
 ```bash
@@ -705,8 +621,7 @@ python scripts/download_local_model.py   # prints setup instructions
 poetry install --extras all-providers
 ```
 
-## Configuration Reference
-
+# Configuration Reference
 All settings are read from environment variables (or `.env`). The table below lists the most commonly adjusted values.
 
 | Variable | Default | Description |
