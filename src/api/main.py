@@ -172,6 +172,9 @@ async def query(
     except QueryProcessingError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+    if outcome.blocked_by_guard:
+        raise HTTPException(status_code=400, detail=outcome.response)
+
     return QueryResponse(
         response=outcome.response,
         sources_cited=outcome.sources_cited,
@@ -186,6 +189,7 @@ async def query(
         injection_decision=outcome.injection_decision,
         pii_redacted_count=outcome.pii_redacted_count,
     )
+
 
 
 @app.get("/me/queries", response_model=List[QueryRecordOut])
