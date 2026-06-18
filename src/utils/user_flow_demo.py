@@ -4,9 +4,9 @@ request/response transcript to an HTML file (for screenshotting) or run
 as a beautiful terminal-based simulation.
 
 Steps demonstrated:
-  1. POST /auth/register con email + password → 201.
+  1. POST /auth/register with email + password → 201.
   2. POST /auth/login → recibimos JWT.
-  3. POST /query con Bearer token → respuesta fundamentada + citas.
+  3. POST /query with Bearer token → respuesta fundamentada + citas.
   4. Mostrar bloqueo: 'Ignore all previous instructions...' → 4xx con motivo.
   5. GET /me/queries → historial del usuario, aislado.
   6. GET /metrics → todas las métricas que diseñamos.
@@ -115,7 +115,7 @@ def record(title, method, path, status, payload, body=None, delay=1.2):
     
     if CLI_MODE:
         # Print request block
-        print(f"\n{C_GRAY}{'='*80}{C_RESET}")
+        print(f"\n{C_GRAY}{'='*70}{C_RESET}")
         print(f"{C_BOLD}{C_CYAN}▸ {title}{C_RESET}")
         print(f"{C_GRAY}  Request:{C_RESET} {C_BOLD}{method}{C_RESET} {path}")
         if body:
@@ -146,9 +146,9 @@ def record(title, method, path, status, payload, body=None, delay=1.2):
 # Demo Workflow Execution
 # ---------------------------------------------------------------------------
 if CLI_MODE:
-    print(f"\n{C_BOLD}{C_GREEN}========================================================================{C_RESET}")
+    print(f"\n{C_BOLD}{C_GREEN}======================================================================{C_RESET}")
     print(f"{C_BOLD}{C_GREEN}                   KNOWLEDGE ASSISTANT API - DEMO FLOW                  {C_RESET}")
-    print(f"{C_BOLD}{C_GREEN}========================================================================{C_RESET}")
+    print(f"{C_BOLD}{C_GREEN}======================================================================{C_RESET}")
     print(f"{C_GRAY}Base URL: {BASE}{C_RESET}")
     time.sleep(1.0)
 else:
@@ -297,9 +297,9 @@ with open(OUT, "w", encoding="utf-8") as f:
     f.write(doc)
 
 if CLI_MODE:
-    print(f"\n{C_BOLD}{C_GREEN}========================================================================{C_RESET}")
+    print(f"\n{C_BOLD}{C_GREEN}======================================================================{C_RESET}")
     print(f"{C_BOLD}{C_GREEN}                         DEMO FLOW COMPLETED!                           {C_RESET}")
-    print(f"{C_BOLD}{C_GREEN}========================================================================{C_RESET}")
+    print(f"{C_BOLD}{C_GREEN}======================================================================{C_RESET}")
     print(f"{C_GRAY}HTML Transcript generated at: {OUT}{C_RESET}\n")
 else:
     print("WROTE", OUT)

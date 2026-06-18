@@ -125,7 +125,7 @@ def print_separator():
 # Demo Interactive Walkthrough
 # ---------------------------------------------------------------------------
 os.system("clear" if os.name == "posix" else "cls")
-print(f"{C_BOLD}{C_GREEN}======================================================================{C_RESET}")
+print(f"\n\n{C_BOLD}{C_GREEN}======================================================================{C_RESET}")
 print(f"{C_BOLD}{C_GREEN}             KNOWLEDGE ASSISTANT — INTERACTIVE DEMO SIMULATION         {C_RESET}")
 print(f"{C_BOLD}{C_GREEN}======================================================================{C_RESET}")
 print(f"{C_GRAY}Connected to API at: {BASE}{C_RESET}")
